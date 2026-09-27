@@ -1,0 +1,73 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <meta name="color-scheme" content="dark light">
+  <meta name="theme-color" content="#0b0e14">
+  <meta name="description" content="Enter Gem Incremental's private-pool daily lottery.">
+  <title>Daily Lottery · Gem Incremental</title>
+  <link rel="icon" href="../src/assets/favicon.ico">
+  <link rel="stylesheet" href="../src/styles/app.css">
+  <link rel="stylesheet" href="./lottery.css">
+  <script>(function(){try{var m=localStorage.getItem("gemIncremental.theme.mode"),a=localStorage.getItem("gemIncremental.theme.accent");if(m)document.documentElement.dataset.theme=m;document.documentElement.dataset.accent=a||"indigo"}catch(e){}})()</script>
+  <script type="module" src="https://static.cloudflareinsights.com/beacon.min.js" data-cf-beacon='{"token":"72a2f511dbb94268878b2aa1623ffe0d"}'></script>
+</head>
+<body>
+  <main class="app-main lottery-page">
+    <header class="page-head lottery-hero">
+      <div class="page-head__title">
+        <p class="lottery-eyebrow">One global draw · 10:00 PM SGT</p>
+        <h1>Daily Lottery</h1>
+        <p class="page-head__sub">Every ticket has equal weight. The pool and odds stay private.</p>
+      </div>
+      <a class="btn" href="../">Back to Roll</a>
+    </header>
+
+    <section class="card lottery-status" id="lotteryStatus" aria-live="polite">
+      <p>Loading today's draw…</p>
+    </section>
+
+    <div class="lottery-grid">
+      <section class="card lottery-buy" aria-labelledby="buyHeading">
+        <div class="lottery-section-head">
+          <div><p class="lottery-kicker">$10,000 each</p><h2 id="buyHeading">Buy tickets</h2></div>
+          <span class="lottery-own" id="ownTickets">Your tickets: —</span>
+        </div>
+
+        <div class="lottery-quick" role="group" aria-label="Quick ticket quantities">
+          <button class="btn" type="button" data-quantity="1">+1</button>
+          <button class="btn" type="button" data-quantity="10">+10</button>
+          <button class="btn" type="button" data-quantity="100">+100</button>
+          <button class="btn" type="button" data-quantity="1000">+1,000</button>
+          <button class="btn" type="button" data-custom>Custom</button>
+        </div>
+
+        <label class="lottery-field" for="ticketQuantity">
+          <span>Tickets</span>
+          <input id="ticketQuantity" type="number" inputmode="numeric" min="1" max="900000000000" step="1" value="1">
+        </label>
+
+        <fieldset class="lottery-funding">
+          <legend>Pay from</legend>
+          <label><input type="radio" name="funding" value="wallet" checked><span>Wallet <strong id="walletBalance">—</strong></span></label>
+          <label><input type="radio" name="funding" value="bank"><span>Bank <strong id="bankBalance">—</strong></span></label>
+        </fieldset>
+
+        <div class="lottery-cost" aria-live="polite">
+          <span>Exact cost</span><strong id="purchaseCost">$10,000</strong>
+          <small id="afterPurchase">Your tickets after purchase: —</small>
+        </div>
+        <button class="btn btn--primary lottery-submit" id="buyTickets" type="button">Buy tickets</button>
+        <p class="lottery-fineprint">Tickets are final, non-refundable, non-transferable, and valid only for this draw. Buying more never guarantees a win.</p>
+      </section>
+
+      <section class="card lottery-results" aria-labelledby="resultsHeading">
+        <div class="lottery-section-head"><div><p class="lottery-kicker">Public record</p><h2 id="resultsHeading">Recent results</h2></div></div>
+        <div id="recentResults"><p class="lottery-empty">Loading results…</p></div>
+      </section>
+    </div>
+  </main>
+  <script type="module" src="./lottery.js"></script>
+</body>
+</html>
