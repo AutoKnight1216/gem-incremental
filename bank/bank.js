@@ -19,12 +19,12 @@ let busy = false;
 const KIND_LABEL = {
   deposit: "Deposit", withdraw: "Withdrawal", borrow: "Loan drawn", repay: "Repayment",
   interest: "Savings interest", loan_interest: "Loan interest", penalty: "Late penalty",
-  seizure: "Savings seized", bankruptcy: "Bankruptcy", lottery: "Daily Lottery tickets"
+  seizure: "Savings seized", bankruptcy: "Bankruptcy"
 };
 // Money leaving the wallet/savings reads as negative for the player.
 const KIND_SIGN = {
   deposit: -1, withdraw: 1, borrow: 1, repay: -1,
-  interest: 1, loan_interest: 0, penalty: 0, seizure: -1, bankruptcy: 0, lottery: -1
+  interest: 1, loan_interest: 0, penalty: 0, seizure: -1, bankruptcy: 0
 };
 
 function render() {
