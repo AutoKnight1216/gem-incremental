@@ -6207,3 +6207,23 @@ input[type="radio"] {
     justify-content: space-between;
   }
 }
+
+/* Month Two anniversary intro. Server state decides whether it appears. */
+.anniversary-intro{position:fixed;inset:0;z-index:100000;display:grid;place-items:center;overflow:hidden;background:radial-gradient(circle at 50% 45%,rgba(91,75,156,.34),rgba(5,7,14,.97) 62%);color:#f7f4ff;text-align:center;isolation:isolate}
+.anniversary-intro__content{position:relative;z-index:2;width:min(760px,calc(100vw - 40px));padding:32px}
+.anniversary-intro__line,.anniversary-intro__counter{margin:0;opacity:0;transform:translateY(12px);transition:opacity .28s ease,transform .28s ease;font-size:clamp(1.35rem,4vw,2.45rem);letter-spacing:.03em}
+.anniversary-intro__line.is-visible,.anniversary-intro__counter.is-visible{opacity:1;transform:none}
+.anniversary-intro__line strong{display:block;font-size:clamp(2rem,7vw,4.9rem);letter-spacing:.09em;text-shadow:0 0 40px rgba(175,155,255,.6)}
+.anniversary-intro__line span{display:block;margin-top:14px;font-size:.55em;letter-spacing:.18em;text-transform:uppercase;color:#c8baff}
+.anniversary-intro__counter{font-size:clamp(2.15rem,8vw,6.2rem);font-variant-numeric:tabular-nums;font-weight:800;letter-spacing:-.035em;text-shadow:0 0 48px rgba(143,207,255,.45)}
+.anniversary-intro__actions{display:flex;justify-content:center;gap:12px;flex-wrap:wrap;opacity:0;transform:translateY(12px);transition:.35s ease}
+.anniversary-intro__actions.is-visible{opacity:1;transform:none}
+.anniversary-intro__hint{position:absolute;top:calc(100% + 28px);left:0;right:0;color:#a9a2bd;letter-spacing:.08em;text-transform:uppercase}
+.anniversary-intro__halves i{position:absolute;top:18%;bottom:18%;width:min(30vw,340px);border:1px solid rgba(183,168,255,.18);background:linear-gradient(135deg,rgba(117,91,214,.08),rgba(91,207,255,.04));opacity:.45;transition:transform 1s cubic-bezier(.2,.8,.2,1),opacity 1s;clip-path:polygon(50% 0,100% 26%,82% 100%,12% 78%,0 24%)}
+.anniversary-intro__halves i:first-child{left:6%;transform:translateX(18%) rotate(-8deg)}
+.anniversary-intro__halves i:last-child{right:6%;transform:translateX(-18%) rotate(8deg) scaleX(-1)}
+.anniversary-intro--split .anniversary-intro__halves i:first-child{transform:translateX(-8%) rotate(-14deg);opacity:.9}
+.anniversary-intro--split .anniversary-intro__halves i:last-child{transform:translateX(8%) rotate(14deg) scaleX(-1);opacity:.9}
+.anniversary-intro-open{overflow:hidden}
+@media(max-width:600px){.anniversary-intro__content{padding:20px}.anniversary-intro__halves i{top:12%;bottom:12%;width:48vw}.anniversary-intro__hint{top:calc(100% + 18px)}}
+@media(prefers-reduced-motion:reduce){.anniversary-intro *{transition-duration:.01ms!important;animation-duration:.01ms!important}}

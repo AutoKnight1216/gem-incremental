@@ -44,6 +44,7 @@ import { initGlobalCash } from "./globalCash.js";
 import { startActivityHeartbeat } from "./activityHeartbeat.js";
 import { getSettings, onSettingsChange } from "./settings.js";
 import { initGlobalCutscenes } from "./globalCutscenes.js";
+import { mountMonthTwoAnniversary } from "./monthTwoAnniversary.js";
 
 
 // =========================================================
@@ -67,6 +68,7 @@ const PAGES = [
   { id: "expeditions", label: "Expeditions", short: "Exped.", href: "expeditions/", icon: icons.map },
   { id: "gem-index", label: "Gem Index", short: "Index", href: "gem-index/", icon: icons.book },
   { id: "mutation-index", label: "Mutation Index", short: "Mutations", href: "mutation-index/", icon: icons.sparkle },
+  { id: "month-two", label: "Month Two", short: "Month 2", href: "recap/month-2/", icon: icons.sparkle },
   { id: "month-one", label: "Month One", short: "Month 1", href: "recap/month-1/", icon: icons.trophy },
   { id: "limited-events", label: "Limited Events", short: "Events", href: "limited-events/", icon: icons.calendar },
   { id: "leaderboards", label: "Leaderboards", short: "Ranks", href: "leaderboards/", icon: icons.trophy },
@@ -162,7 +164,7 @@ const EXPLORE_GROUPS = [
     id: "community",
     label: "Community",
     icon: icons.users,
-    pageIds: ["leaderboards", "roll-counts", "month-one", "guilds", "wars", "pvp", "world-bosses"]
+    pageIds: ["leaderboards", "roll-counts", "month-two", "month-one", "guilds", "wars", "pvp", "world-bosses"]
   },
   {
     id: "activities",
@@ -286,6 +288,7 @@ export function mountShell({ page, base = "./" }) {
   // Rare reveals are an application-shell concern: rolls can complete while
   // the player is on any page, so every route mounts the same durable queue.
   initGlobalCutscenes();
+  mountMonthTwoAnniversary({ base });
   keepSegmentedTabsInView();
 
   const header = document.createElement("header");
