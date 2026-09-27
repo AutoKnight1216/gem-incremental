@@ -17,6 +17,9 @@ globalThis.Deno={env:{get:()=>''}};
 Object.defineProperty(globalThis,'crypto',{value:{getRandomValues(a){const stack=new Error().stack;a[0]=forceLoss && /jackpotRoll/.test(stack)?0:forceProcs && /finishEquipmentRoll|exclusiveMutations/.test(stack)?0:forceOrdinaryProcs && /rollGemMutations/.test(stack)?0:2**31;return a;}},configurable:true});
 const {default:handler}=await import('data:text/javascript;base64,'+Buffer.from(source+'\n//# sourceURL=roll-handler-under-test.mjs').toString('base64'));
 let player,equipment,boosts,oneRoll,admin,commits,saved,rpcs,rpcCalls;
+const defaultMutationCatalog=[{id:'polished',name:'Polished',chance:100,multiplier:1.5},{id:'shifted',name:'Shifted',chance:5,multiplier:35}];
+let activeMutationCatalog=defaultMutationCatalog;
+let activeMutationCatalogVersion=1;
 let qolSettings = { discoveryKeep:false }, bundleResponse = {status:"none"}, saleFailure=false, craftActive=false, craftResponse={deposited:false};
 const uid='00000000-0000-0000-0000-000000000001';
 class Query {
@@ -29,7 +32,7 @@ class Query {
   if(this.mode==='insert'&&this.table==='inventory_gems'){data={id:101,...this.payload};saved=data;}
   else if(this.mode==='read') {
    const tables={players:player,player_crafting:{active_auto_craft:craftActive?'craft':null},game_recipes:{recipe:{equipmentOverhaul:true,requirements:[]}},crafting_progress:{progress:{}},player_equipment:equipment,player_boosts:boosts,player_one_roll_boosts:oneRoll,admin_events:admin,
-    museum_artifact_registrations:[],player_gem_mutation_combinations:[],game_mutations:[{id:'polished',name:'Polished',chance:100,multiplier:1.5},{id:'shifted',name:'Shifted',chance:5,multiplier:35}],
+    museum_artifact_registrations:[],player_gem_mutation_combinations:[],game_mutations:activeMutationCatalog,
     private_feature_gems:[{name:'Test gem',rarity:100000,base_weight:100,value_per_gram:2,affected_by_luck:true,availability_mode:'always',special_gem:false},{name:'Quartz',rarity:2,base_weight:1,value_per_gram:1,affected_by_luck:true,availability_mode:'always',special_gem:false}]};
    data=tables[this.table]??(this.singleRow?null:[]);
   }
@@ -41,9 +44,9 @@ const rollContext=()=>({
  qol:{settings:qolSettings,discoveries:['Test gem']},activeBoosts:boosts,oneRollBoost:oneRoll,
  activeAdminEvent:admin,globalEvent:null,crystalEffects:{luckBonus:2,finalLuckMultiplier:3},
  expeditionArtifactEffects:{luckBonus:3},guild:{membership:null,shopBuffIds:[]},
- catalogVersions:{gems:1,mutations:1},
+ catalogVersions:{gems:1,mutations:activeMutationCatalogVersion},
  gemCatalog:[{name:'Test gem',rarity:100000,base_weight:100,value_per_gram:2,affected_by_luck:true,availability_mode:'always',special_gem:false},{name:'Quartz',rarity:2,base_weight:1,value_per_gram:1,affected_by_luck:true,availability_mode:'always',special_gem:false}],
- mutationCatalog:[{id:'polished',name:'Polished',chance:100,multiplier:1.5},{id:'shifted',name:'Shifted',chance:5,multiplier:35}]
+ mutationCatalog:activeMutationCatalog
 });
 const client={from:t=>new Query(t),rpc:async(name,args)=>{
  rpcs.push(name);rpcCalls.push({name,args:structuredClone(args)});
@@ -71,9 +74,11 @@ const client={from:t=>new Query(t),rpc:async(name,args)=>{
  if(name==='spend_one_roll_charge'){oneRoll=null;return {data:0,error:null};}
  return {data:responses[name]??null,error:null};
 }};
-async function run(id,state={},enchant=null,batchSize=1) {
+async function run(id,state={},enchant=null,batchSize=1,options={}) {
  commits=[];saved=null;rpcs=[];rpcCalls=[];
- player={id:uid,inventory_capacity:100,total_rolls:5000,next_roll_at:null,mutation_luck:1,equipment_state:state,rarity_resonance:0,misty_mutation_boost_rolls:10,misty_mutation_boost_stacks:5,player_research_effects:{luck_multiplier:9,roll_speed_multiplier:7,mutation_chance_multiplier:30,weight_luck_multiplier:20,gem_value_multiplier:100,extreme_luck_multiplier:50,statistical_breakthrough:true}};
+ activeMutationCatalog=options.mutationCatalog??defaultMutationCatalog;
+ activeMutationCatalogVersion+=1;
+ player={id:uid,inventory_capacity:100,total_rolls:5000,next_roll_at:null,mutation_luck:1,equipment_state:state,rarity_resonance:0,misty_mutation_boost_rolls:options.mistyRolls??0,misty_mutation_boost_stacks:options.mistyStacks??0,player_research_effects:{luck_multiplier:9,roll_speed_multiplier:7,mutation_chance_multiplier:30,weight_luck_multiplier:20,gem_value_multiplier:100,extreme_luck_multiplier:50,statistical_breakthrough:true}};
  equipment=[{id:1,equipment_id:id,category:'pickaxe',enchant_id:enchant,enchant_state:{rolls:6},enchant_grade:'normal'},
  {id:2,category:'clover',luck_bonus:.1},{id:3,category:'lantern',mutation_chance_bonus:.25},{id:4,category:'boots',weight_luck_bonus:.15},{id:5,category:'bag',weight_multiplier_bonus:.15}];
  boosts=[{family:'luck',effect_value:7}];oneRoll={effect_value:1000,charges:1,consumable_id:'mythic-potion'};admin={luck_bonus:5,luck_multiplier:2,roll_speed_bonus:.1,roll_speed_multiplier:3,weight_luck_bonus:.2,weight_luck_multiplier:2,weight_multiplier_bonus:.3,weight_multiplier_multiplier:2,mutation_luck_bonus:.2,mutation_luck_multiplier:2};
@@ -93,6 +98,62 @@ result=await run('all-in-pickaxe');
 assert.deepEqual(saved.mutation_ids.sort(),['polished','tryhard']);
 near(saved.mutation_multipliers.tryhard,10);near(saved.mutation_multipliers.polished,1.5);
 near(saved.mutation_multiplier,15);near(result.value,saved.final_weight*2*15);
+
+const exactCapCatalog=[{id:'cap-a',name:'Cap A',chance:1,multiplier:1000},{id:'cap-b',name:'Cap B',chance:1,multiplier:100}];
+result=await run('money-pickaxe',{},null,1,{mutationCatalog:exactCapCatalog});
+assert.equal(saved.mutation_multiplier,100000,'an exactly ×100,000 combination is unchanged');
+
+const oversizedCatalog=[{id:'huge-a',name:'Huge A',chance:1,multiplier:1000},{id:'huge-b',name:'Huge B',chance:1,multiplier:1000}];
+const anomalyWarnings=[];
+const originalWarn=console.warn;
+console.warn=(...args)=>anomalyWarnings.push(args);
+try {
+ result=await run('money-pickaxe',{},null,1,{mutationCatalog:oversizedCatalog});
+} finally {
+ console.warn=originalWarn;
+}
+assert.equal(saved.mutation_multiplier,100000,'an oversized combination is stored at the applied cap');
+assert.equal(result.mutationMultiplier,100000,'the response exposes the applied cap');
+assert.equal(anomalyWarnings.length,1);
+assert.equal(anomalyWarnings[0][0],'MUTATION_VALUE_MULTIPLIER_CAP');
+assert.deepEqual(anomalyWarnings[0][1].mutationIds,['huge-a','huge-b']);
+assert.equal(anomalyWarnings[0][1].rawCalculatedMultiplier,1000000);
+assert.equal(anomalyWarnings[0][1].appliedMultiplier,100000);
+assert.equal(anomalyWarnings[0][1].playerId,uid);
+assert.equal(anomalyWarnings[0][1].gemName,result.gem.name);
+assert.equal(anomalyWarnings[0][1].rollNumber,5001);
+assert.ok(Number.isNaN(Date.parse(anomalyWarnings[0][1].timestamp))===false);
+
+console.warn=()=>{throw new Error('simulated logging outage');};
+try {
+ result=await run('money-pickaxe',{},null,1,{mutationCatalog:oversizedCatalog});
+ assert.equal(result.mutationMultiplier,100000,'logging failures do not fail successful rolls');
+} finally {
+ console.warn=originalWarn;
+}
+console.log('Mutation-value safeguard: below/equal cap preservation, oversized cap, diagnostics and fail-open logging passed.');
+
+const mistyOnlyCatalog=[{id:'misty',name:'Misty',chance:1,multiplier:2}];
+const mistyBatch=await run('money-pickaxe',{},null,4,{mutationCatalog:mistyOnlyCatalog});
+assert.deepEqual(
+ mistyBatch.results.map(entry=>entry.activeMutationEffects.find(effect=>effect.id==='misty')?.multiplier),
+ [2.5,6.25,15.625,15.625],
+ 'Misty stacks 1→2→3 and never creates stack 4'
+);
+assert.deepEqual(
+ commits.map(call=>[call.p_player_patch.misty_mutation_boost_stacks,call.p_player_patch.misty_mutation_boost_rolls]),
+ [[1,10],[2,10],[3,10],[undefined,undefined]],
+ 'each genuine batch subroll persists the required Misty state without a redundant fourth write'
+);
+assert.ok(mistyBatch.results.every(entry=>entry.activeMutationEffects.find(effect=>effect.id==='misty')?.rollsRemaining===10));
+assert.equal(player.misty_mutation_boost_stacks,3);
+assert.equal(player.misty_mutation_boost_rolls,10);
+const cappedMistyRefresh=await run('money-pickaxe',{},null,1,{mutationCatalog:mistyOnlyCatalog,mistyRolls:4,mistyStacks:3});
+assert.equal(cappedMistyRefresh.activeMutationEffects.find(effect=>effect.id==='misty')?.multiplier,15.625);
+assert.equal(commits[0].p_player_patch.misty_mutation_boost_stacks,3);
+assert.equal(commits[0].p_player_patch.misty_mutation_boost_rolls,10);
+console.log('Misty safeguard: normal stacking, stack-three refresh and batch genuine-roll persistence passed.');
+
 forceOrdinaryProcs=false;
 result=await run('all-rounder-toy');assert.ok(saved.mutation_ids.includes('balanced'));near(saved.mutation_multipliers.balanced,1.2);assert.equal(result.effectiveRarityExact,'200000000');
 forceProcs=false;

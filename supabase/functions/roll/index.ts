@@ -1204,6 +1204,52 @@ let gemMutations = [
   { id: "corrupted", name: "Corrupted", chance: 1 / 50000, multiplier: 30 }
 ];
 
+export const MAX_MISTY_STACKS = 3;
+export const MAX_COMBINED_MUTATION_VALUE_MULTIPLIER = 100000;
+
+export function capCombinedMutationValueMultiplier(mutations: Array<{ multiplier?: unknown }> = []) {
+  const rawMultiplier = mutations.reduce(
+    (total, mutation) => total * Number(mutation.multiplier ?? 1),
+    1
+  );
+  return {
+    rawMultiplier,
+    appliedMultiplier: Math.min(rawMultiplier, MAX_COMBINED_MUTATION_VALUE_MULTIPLIER),
+    capped: rawMultiplier > MAX_COMBINED_MUTATION_VALUE_MULTIPLIER
+  };
+}
+
+export function nextMistyBoostState(
+  rollsBefore: unknown,
+  stacksBefore: unknown,
+  mistyProcced: boolean
+) {
+  const activeRollsBefore = Math.max(0, Number(rollsBefore ?? 0));
+  const activeStacksBefore = activeRollsBefore > 0
+    ? Math.min(MAX_MISTY_STACKS, Math.max(0, Number(stacksBefore ?? 0)))
+    : 0;
+  let rolls = Math.max(0, activeRollsBefore - 1);
+  let stacks = rolls > 0 ? activeStacksBefore : 0;
+  if (mistyProcced) {
+    stacks = Math.min(MAX_MISTY_STACKS, activeStacksBefore + 1);
+    rolls = 10;
+  }
+  return { rolls, stacks };
+}
+
+export function logMutationValueMultiplierAnomaly(context: Record<string, unknown>) {
+  try {
+    console.warn("MUTATION_VALUE_MULTIPLIER_CAP", {
+      event: "mutation_value_multiplier_cap",
+      timestamp: new Date().toISOString(),
+      ...context
+    });
+  } catch {
+    // Observability is deliberately best-effort: a logging failure must never
+    // turn an otherwise successful authoritative roll into an error.
+  }
+}
+
 // Restore the hardcoded mutation-luck player.
 const MUTATION_LUCK_PLAYER_ID =
   "38d5e8ce-18af-46d3-aa9e-6e601e75dd78";
@@ -2639,7 +2685,9 @@ async function executeSingleRoll(
 
       // Temporary mutation effects from PREVIOUS rolls.
       const mistyBoostRollsBefore = Math.max(0, Number(player.misty_mutation_boost_rolls ?? 0));
-      const mistyBoostStacksBefore = Math.max(0, Number(player.misty_mutation_boost_stacks ?? 0));
+      const mistyBoostStacksBefore = mistyBoostRollsBefore > 0
+        ? Math.min(MAX_MISTY_STACKS, Math.max(0, Number(player.misty_mutation_boost_stacks ?? 0)))
+        : 0;
       const ancientRelicBoostRollsBefore = Math.max(0, Number(player.ancient_relic_boost_rolls ?? 0));
       const enchantedRelicBoostRollsBefore = Math.max(0, Number(player.enchanted_relic_boost_rolls ?? 0));
       const allRelicChanceMultiplier = !allIn && enchantedRelicBoostRollsBefore > 0 ? 1.1 : 1;
@@ -2847,12 +2895,9 @@ async function executeSingleRoll(
         ? []
         : [...rollGemMutations(mutationChanceMultiplier, eventContext), ...exclusiveMutations(equipmentContext.id, random01, true, equipmentContext.flags), ...(supersizerSize ? [supersizerSize] : [])];
 
-      const mutationMultiplier =
-        mutations.reduce(
-          (total, mutation) =>
-            total * mutation.multiplier,
-          1
-        );
+      const mutationValueMultiplier = capCombinedMutationValueMultiplier(mutations);
+      const rawMutationMultiplier = mutationValueMultiplier.rawMultiplier;
+      const mutationMultiplier = mutationValueMultiplier.appliedMultiplier;
 
       // Effective rarity uses mutation odds, not their specimen-value boosts.
       // Every mutation is independent, so their chance denominators multiply.
@@ -2883,20 +2928,39 @@ async function executeSingleRoll(
           ])
         );
 
+      const rollNumber = Number(player.total_rolls ?? 0) + 1;
+      if (mutationValueMultiplier.capped) {
+        logMutationValueMultiplierAnomaly({
+          rawCalculatedMultiplier: rawMutationMultiplier,
+          appliedMultiplier: mutationMultiplier,
+          mutationIds,
+          playerId,
+          gemName: gem.name,
+          rollNumber,
+          genuineRoll,
+          batchIndex,
+          pool: batchExecution.pool,
+          specimenKind: "primary",
+          sourceEventOccurrenceId: eventContext.occurrenceId,
+          sourceEventKey: eventContext.eventKey
+        });
+      }
+
       // Consume temporary mutation effects for this roll, then grant/refresh
       // effects earned by mutations on this roll. The roll lease ensures one
       // authoritative roll is processed for a player at a time.
       const rolledMutationIdsSet = new Set(mutationIds);
-      let nextMistyRolls = Math.max(0, mistyBoostRollsBefore - 1);
-      let nextMistyStacks = nextMistyRolls > 0 ? mistyBoostStacksBefore : 0;
+      const nextMisty = nextMistyBoostState(
+        mistyBoostRollsBefore,
+        mistyBoostStacksBefore,
+        rolledMutationIdsSet.has("misty")
+      );
+      let nextMistyRolls = nextMisty.rolls;
+      let nextMistyStacks = nextMisty.stacks;
       let nextAncientRelicRolls = Math.max(0, ancientRelicBoostRollsBefore - 1);
       let nextEnchantedRelicRolls = Math.max(0, enchantedRelicBoostRollsBefore - 1);
       const playerPatch: Record<string, unknown> = {};
 
-      if (rolledMutationIdsSet.has("misty")) {
-        nextMistyStacks = (mistyBoostRollsBefore > 0 ? mistyBoostStacksBefore : 0) + 1;
-        nextMistyRolls = 10;
-      }
       if (rolledMutationIdsSet.has("ancient")) {
         nextAncientRelicRolls = 3;
       }
@@ -3248,14 +3312,28 @@ async function executeSingleRoll(
         );
         const duplicateFinalWeight = duplicateRolledWeight * weightMultiplier * (buffsEnabled ? masterworkWeightFactor * duplicateBagPassiveFactor : 1);
         const duplicateMutations = rollGemMutations(mutationChanceMultiplier, eventContext);
-        const duplicateMutationMultiplier = duplicateMutations.reduce(
-          (total, mutation) => total * mutation.multiplier,
-          1
-        );
+        const duplicateMutationValueMultiplier = capCombinedMutationValueMultiplier(duplicateMutations);
+        const duplicateMutationMultiplier = duplicateMutationValueMultiplier.appliedMultiplier;
         const duplicateMutationIds = duplicateMutations.map((mutation) => mutation.id);
         const duplicateMutationMultipliers = Object.fromEntries(
           duplicateMutations.map((mutation) => [mutation.id, mutation.multiplier])
         );
+        if (duplicateMutationValueMultiplier.capped) {
+          logMutationValueMultiplierAnomaly({
+            rawCalculatedMultiplier: duplicateMutationValueMultiplier.rawMultiplier,
+            appliedMultiplier: duplicateMutationMultiplier,
+            mutationIds: duplicateMutationIds,
+            playerId,
+            gemName: gem.name,
+            rollNumber,
+            genuineRoll,
+            batchIndex,
+            pool: batchExecution.pool,
+            specimenKind: "vein_hunter_duplicate",
+            sourceEventOccurrenceId: eventContext.occurrenceId,
+            sourceEventKey: eventContext.eventKey
+          });
+        }
         const duplicateResearchMutationValue = duplicateMutations.length
           ? researchNumber("mutated_value_multiplier") * (1 + Math.min(5, duplicateMutations.length) * Math.max(0, Number(researchEffects.compound_value_per_mutation ?? 0)))
           : 1;
@@ -3351,12 +3429,30 @@ async function executeSingleRoll(
         );
         const extraWeight = rollWeightMultiplier(weightLuck * eventWeightLuckFactor(eventContext, extra));
         const extraMutations = rollGemMutations(mutationChanceMultiplier, eventContext);
-        const extraMutationMultiplier = extraMutations.reduce((n: number, m: any) => n * m.multiplier, 1);
+        const extraMutationValueMultiplier = capCombinedMutationValueMultiplier(extraMutations);
+        const extraMutationMultiplier = extraMutationValueMultiplier.appliedMultiplier;
         const extraFinalWeight = extra.baseWeight * extraWeight * weightMultiplier;
+        const extraMutationIds = extraMutations.map((mutation: any) => mutation.id);
+        if (extraMutationValueMultiplier.capped) {
+          logMutationValueMultiplierAnomaly({
+            rawCalculatedMultiplier: extraMutationValueMultiplier.rawMultiplier,
+            appliedMultiplier: extraMutationMultiplier,
+            mutationIds: extraMutationIds,
+            playerId,
+            gemName: extra.name,
+            rollNumber,
+            genuineRoll,
+            batchIndex,
+            pool: batchExecution.pool,
+            specimenKind: "breakneck_bonus",
+            sourceEventOccurrenceId: eventContext.occurrenceId,
+            sourceEventKey: eventContext.eventKey
+          });
+        }
         breakneckGem = {
           gem_name: extra.name, rarity: extra.rarity, base_weight: extra.baseWeight, value_per_gram: extra.valuePerGram,
           rolled_weight_multiplier: extraWeight, rolled_weight: extra.baseWeight * extraWeight, final_weight: extraFinalWeight,
-          mutation_id: extraMutations[0]?.id ?? null, mutation_ids: extraMutations.map((m: any) => m.id),
+          mutation_id: extraMutations[0]?.id ?? null, mutation_ids: extraMutationIds,
           mutation_multiplier: extraMutationMultiplier, mutation_multipliers: Object.fromEntries(extraMutations.map((m: any) => [m.id,m.multiplier])),
           mutation_chance_multiplier: mutationChanceMultiplier,
           value: extraFinalWeight * extra.valuePerGram * extraMutationMultiplier * researchNumber('gem_value_multiplier') *
@@ -3370,7 +3466,6 @@ async function executeSingleRoll(
       }
 
       const combinationKey = getMutationCombinationKey(mutationIds);
-      const rollNumber = Number(player.total_rolls ?? 0) + 1;
       const boostTiers = Object.fromEntries(
         activeBoosts.map((boost) => [boost.family, Number(boost.tier ?? 0)])
       );

@@ -43,7 +43,8 @@
     "test:deepcore": "node tests/deepcore-project-2026-test.mjs",
     "test:deep-sea": "node tests/deep-sea-event-test.mjs && node tests/deep-sea-database-test.mjs",
     "test:market-pricing": "node tests/market-pricing-limits-test.mjs",
-    "test:stacked-relics": "node tests/stacked-relic-balances-test.mjs"
+    "test:stacked-relics": "node tests/stacked-relic-balances-test.mjs",
+    "test:mutation-safeguards": "node tests/mutation-safeguards-test.mjs && node tests/five-item-handler-test.mjs"
   },
   "devDependencies": {
     "@electric-sql/pglite": "0.3.14"
