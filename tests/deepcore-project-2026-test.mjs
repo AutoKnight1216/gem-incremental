@@ -7,6 +7,7 @@ const triggerSql=read("supabase/migrations/20260916125715_install_deepcore_hot_t
 const leaderboardRewardSql=read("supabase/migrations/20260920035123_add_deepcore_leaderboard_consumable_rewards.sql");
 const phase52AutoSql=read("supabase/migrations/20260923041854_fix_deepcore_phase_52_auto_contribute.sql");
 const routeRebalanceSql=read("supabase/migrations/20260925103659_rebalance_deepcore_route_specimen_requirements.sql");
+const crystalline500Sql=read("supabase/migrations/20260927100742_nerf_deepcore_crystalline_passage_to_500.sql");
 const deepcoreEdge=read("supabase/functions/deepcore/index.ts");
 const roll=read("supabase/functions/roll/index.ts");
 const page=read("limited-events/deepcore/index.html");
@@ -25,6 +26,7 @@ assert.match(deployment,/20260916125715_install_deepcore_hot_table_triggers\.sql
 assert.match(deployment,/20260920035123_add_deepcore_leaderboard_consumable_rewards\.sql/);
 assert.match(deployment,/20260923041854_fix_deepcore_phase_52_auto_contribute\.sql/);
 assert.match(deployment,/20260925103659_rebalance_deepcore_route_specimen_requirements\.sql/);
+assert.match(deployment,/20260927100742_nerf_deepcore_crystalline_passage_to_500\.sql/);
 assert.match(leaderboardRewardSql,/\(1,10,6,3,1\)/); assert.match(leaderboardRewardSql,/\(5,4,2,1,0\)/);
 assert.match(leaderboardRewardSql,/deepcore_leaderboard_reward_grants/);
 assert.match(sql,/for update/); assert.match(sql,/unique\(player_id,request_id\)/);
@@ -44,7 +46,8 @@ assert.match(client,/setInterval\(refreshRequirements,30_000\)/); assert.match(c
 assert.match(page,/autoRoute/); assert.match(client,/Crate opened:/); assert.match(client,/Deepcore Roll Card!/);
 assert.match(deepcoreEdge,/p_route: b\.route \?\? null/);
 assert.match(phase52AutoSql,/e\.phase not in \(2,3,4,52\)/); assert.match(phase52AutoSql,/auto_route='crystalline'/); assert.match(phase52AutoSql,/auto_route='anomalous'/);
-assert.match(routeRebalanceSql,/crystalline_specimens>=1000/); assert.match(client,/1,000 Exotic\+/); assert.match(client,/10 ≥1M-rarity special gems/);
+assert.match(routeRebalanceSql,/crystalline_specimens>=1000/); assert.match(client,/10 ≥1M-rarity special gems/);
+assert.match(crystalline500Sql,/crystalline_specimens>=500/); assert.match(client,/500 Exotic\+/); assert.doesNotMatch(client,/1,000 Exotic\+/);
 for(const reward of ["Deepcore Catalyst","Pressurized Catalyst","Seismic Potion","Unstable Core"]) assert.match(client,new RegExp(reward));
 assert.match(page,/Placing on both boards grants both packages/); assert.match(client,/remaining consumables and Deepcore Crates are still usable/);
 assert.match(cutscenes,/deepcore-pressure/); assert.match(cutscenes,/deepcore-heartbeat/);
@@ -56,6 +59,7 @@ await db.exec(triggerSql);
 await db.exec(leaderboardRewardSql);
 await db.exec(phase52AutoSql);
 await db.exec(routeRebalanceSql);
+await db.exec(crystalline500Sql);
 const one=async(q,args=[])=>(await db.query(q,args)).rows[0];
 assert.equal((await one("select deepcore_private.status('2026-09-19T23:59:59.999Z') status")).status,"preview");
 assert.equal((await one("select deepcore_private.status('2026-09-20T00:00:00Z') status")).status,"active");
@@ -125,10 +129,10 @@ assert.equal(automatic.contributed,true); assert.equal(automatic.objective,"anom
 assert.equal(Number((await one("select anomalous_specimens from deepcore_event_state")).anomalous_specimens),1,"Anomalous auto-routing advances only its selected passage");
 await db.query("select set_config('request.jwt.claims',$1,false)",[JSON.stringify({role:"authenticated"})]);
 
-await db.exec("update deepcore_event_state set phase=52,crystalline_funding=1500000000,crystalline_specimens=999,anomalous_funding=0,anomalous_specimens=10,route_winner=null");
+await db.exec("update deepcore_event_state set phase=52,crystalline_funding=1500000000,crystalline_specimens=499,anomalous_funding=0,anomalous_specimens=10,route_winner=null");
 await db.exec("select deepcore_private.resolve_route()");
-assert.equal((await one("select route_winner from deepcore_event_state")).route_winner,null,"Crystalline does not resolve below 1,000 specimens");
-await db.exec("update deepcore_event_state set phase=52,crystalline_funding=1500000000,crystalline_specimens=1000,anomalous_funding=1500000000,anomalous_specimens=10,route_winner=null");
+assert.equal((await one("select route_winner from deepcore_event_state")).route_winner,null,"Crystalline does not resolve below 500 specimens");
+await db.exec("update deepcore_event_state set phase=52,crystalline_funding=1500000000,crystalline_specimens=500,anomalous_funding=1500000000,anomalous_specimens=10,route_winner=null");
 await db.exec("select deepcore_private.resolve_route(); select deepcore_private.resolve_route()");
 const route=await one("select route_winner,route_loser_snapshot from deepcore_event_state");
 assert.equal(route.route_winner,"crystalline","the locked route resolver records exactly one winner");
