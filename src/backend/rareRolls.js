@@ -74,10 +74,10 @@ function qualifies(row) {
     : row.isAnomalous || row.rarity >= RARE_ROLL_BASE_THRESHOLD;
 }
 
-export async function loadRareRolls(limit = 30) {
-  const safeLimit = Math.min(100, Math.max(1, Number(limit) || 30));
+export async function loadRareRolls(limitPerCategory = 5) {
+  const safeLimit = Math.min(100, Math.max(1, Number(limitPerCategory) || 5));
   const [history, catalog] = await Promise.all([
-    supabase.rpc("get_rare_roll_chat_history", { p_limit: safeLimit * 2 }),
+    supabase.rpc("get_rare_roll_chat_history", { p_limit: safeLimit }),
     mutationCatalog()
   ]);
   if (history.error) throw history.error;
@@ -86,10 +86,13 @@ export async function loadRareRolls(limit = 30) {
   const profiles = await profilesFor(historyRows.map((row) => row.player_id));
   const genuineRolls = historyRows.map((row) => normalize(row, profiles, catalog, true));
 
-  return genuineRolls
+  const qualified = genuineRolls
     .filter(qualifies)
-    .sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt))
-    .slice(0, safeLimit);
+    .sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
+
+  return ["base", "mutation"]
+    .flatMap((kind) => qualified.filter((row) => row.kind === kind).slice(0, safeLimit))
+    .sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
 }
 
 export function subscribeToRareRolls(onChange) {
