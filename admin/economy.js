@@ -13,6 +13,7 @@ const labels = {
   expedition_services:'Expedition entry, funding & services', expedition_rewards:'Expedition rewards',
   market_escrow:'Market trades & escrow', war_escrow:'War wagers & escrow', market_fees:'Market & wager fees',
   bank_deposit:'Wallet → bank', bank_withdrawal:'Bank → wallet',
+  lottery:'Daily lottery',
   account_initialization:'New account balances', account_removal:'Account removal',
   bank_bug_correction:'Historical bank-bug correction', unclassified:'Unclassified', unattributed:'Unclassified'
 };
@@ -66,6 +67,35 @@ export function renderEconomy(data) {
     <p class="admin-note">Corrections preserve the raw ledger and explain exceptional cleanup without treating it as gameplay. Recorded wallet + bank change: ${money(data.balanceChange)} = net economic change ${money(data.netCreation)} + transfer net ${money(data.transferNet)} + corrections ${money(correctionNet)} + unclassified ${money(unclassifiedNet)}.</p>`;
 }
 
+function ratio(value) {
+  const percent=Number(value||0)*100;
+  return `${percent.toLocaleString(undefined,{maximumFractionDigits:2})}%`;
+}
+
+export function renderLotteryAnalytics(data) {
+  const stats=[
+    ['Gross ticket spending',money(data.grossSpending)],
+    ['Winner payouts',money(data.payouts)],
+    ['Net cash burned',money(data.netBurn)],
+    ['Effective burn rate',ratio(data.effectiveBurnRate)],
+    ['Completed draws',formatCount(data.draws)],
+    ['Participant entries',formatCount(data.participantEntries)],
+    ['Unique participants',formatCount(data.uniqueParticipants)],
+    ['Repeat participants',formatCount(data.repeatParticipants)],
+    ['Largest purchase',money(data.largestPurchase)],
+    ['Largest draw allocation',money(data.largestDrawSpender)],
+    ['Top player spend share',ratio(data.topPlayerSpendingShare)],
+    ['Lottery share of sinks',ratio(data.lotteryShareOfSinks)],
+    ['Burn vs gem-sale revenue',ratio(data.burnVsGemSaleRevenue)]
+  ];
+  const draws=data.drawAudit||[];
+  return `<section class="economy-breakdown lottery-admin-breakdown"><h3>Daily Lottery</h3>
+    <div class="economy-stats">${stats.map(([name,value])=>`<div class="economy-stat"><span>${name}</span><strong>${value}</strong></div>`).join('')}</div>
+    <p class="admin-note">Private audit data below is admin-only. Public lottery responses never include pool size, odds, payout constant, gross revenue, burn, or allocations.</p>
+    ${draws.length?`<div class="shareholders-table-wrap"><table class="shareholders-table"><thead><tr><th>Draw</th><th>Tickets / players</th><th>Gross → payout</th><th>Winner audit</th></tr></thead><tbody>${draws.map(draw=>`<tr><td><strong>${escapeHtml(draw.drawDate)}</strong><small>${escapeHtml(draw.finalActivityBand||'—')}</small></td><td>${formatCount(draw.totalTickets)} / ${formatCount(draw.uniqueParticipants)}</td><td>${money(draw.grossRevenue)} → ${money(draw.prize)}<small>${money(draw.effectiveBurn)} burned</small></td><td>${draw.winnerId?`${escapeHtml(draw.winnerId)}<small>ticket ${formatCount(draw.winningInteger)} · held ${formatCount(draw.winnerTicketCount)}</small>`:'No winner'}</td></tr>`).join('')}</tbody></table></div>`:'<p class="economy-empty">No completed lottery draws in this period.</p>'}
+  </section>`;
+}
+
 export function mountEconomy({panel,content,summary,filters,refresh,rpc}) {
   let period='24H';
   let request=0;
@@ -76,11 +106,16 @@ export function mountEconomy({panel,content,summary,filters,refresh,rpc}) {
     content.innerHTML='<p class="admin-note" role="status">Loading economy breakdown…</p>';
     summary.textContent=`${period} · Loading…`;
     try {
-      const {data,error}=await rpc('admin_get_economy_breakdown',{p_period:period});
+      const [{data,error},{data:lottery,error:lotteryError}]=await Promise.all([
+        rpc('admin_get_economy_breakdown',{p_period:period}),
+        rpc('admin_get_lottery_analytics',{p_period:period})
+      ]);
       if(current!==request)return;
       if(error)throw error;
       if(!data?.trackingSince || !Array.isArray(data.breakdown))throw new Error('Economy service returned incomplete data.');
-      content.innerHTML=renderEconomy(data);
+      content.innerHTML=renderEconomy(data)+(lotteryError
+        ? '<p class="admin-note">Lottery analytics are unavailable until the Daily Lottery migration is deployed.</p>'
+        : renderLotteryAnalytics(lottery));
       summary.textContent=`${data.period} · Updated ${new Date(data.generatedAt).toLocaleString()}`;
     } catch(error) {
       if(current!==request)return;
