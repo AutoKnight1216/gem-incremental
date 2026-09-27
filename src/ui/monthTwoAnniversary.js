@@ -1,4 +1,5 @@
 import { supabase } from "../backend/supabase.js";
+import { ensurePlayerAuth } from "../backend/auth.js";
 
 let mounted = false;
 let activeOverlay = null;
@@ -12,7 +13,7 @@ const wait = (milliseconds, state) => new Promise((resolve) => {
 });
 
 function formatRolls(value) {
-  return Math.max(0, Number(value) || 0).toLocaleString("en-US");
+  return Math.round(Math.max(0, Number(value) || 0)).toLocaleString("en-US");
 }
 
 function countTo(element, from, to, state) {
@@ -109,8 +110,8 @@ async function present(payload, base) {
 }
 
 export async function playMonthTwoAnniversary({ base = "./", replay = false } = {}) {
-  const { data: sessionData } = await supabase.auth.getSession();
-  if (!sessionData.session?.user) return false;
+  const user = await ensurePlayerAuth();
+  if (!user) return false;
   const { data, error } = await supabase.rpc("get_month_two_anniversary_intro", { p_replay: replay });
   if (error || !data?.show) return false;
   await present(data, base);
