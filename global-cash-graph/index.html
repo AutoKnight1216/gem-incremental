@@ -51,38 +51,71 @@
       <div class="page-head__title">
         <h1>Cash Market</h1>
         <p class="page-head__sub">
-          The whole economy over time — sampled every few minutes.
+          The whole economy, quoted live — ticks about once a second.
         </p>
       </div>
     </div>
 
     <section class="card market">
-      <!-- Ticker: current value + change over the selected range -->
+      <!-- Quote header: name, live price, change over the selected range -->
       <div class="market__head">
-        <div class="market__ticker">
-          <div class="market__metric-row">
-            <span class="market__pill" data-metric-name>Global cash</span>
-            <span class="market__live" title="Updates automatically">
+        <div class="market__quote">
+          <div class="market__name-row">
+            <span class="market__name" data-metric-name>Global cash</span>
+            <span class="market__symbol" data-symbol>GLBL</span>
+            <span class="market__live" title="Updates about once a second">
               <span class="market__live-dot" aria-hidden="true"></span>Live
             </span>
           </div>
-          <div class="market__price" data-price>—</div>
-          <div class="market__change" data-change>
-            <span data-change-abs>—</span>
-            <span class="market__change-pct" data-change-pct></span>
+          <div class="market__exchange">Gem Incremental economy · Real time · USD</div>
+          <div class="market__quote-row">
+            <span class="market__price" data-price>—</span>
+            <span class="market__change" data-change>
+              <span data-change-abs>—</span>
+              <span class="market__change-pct" data-change-pct></span>
+            </span>
             <span class="market__change-range" data-change-range></span>
           </div>
+          <div class="market__asof" data-asof>Connecting…</div>
         </div>
 
         <div class="market__metric-toggle segmented" role="tablist" aria-label="Metric">
-          <button class="segmented__item active" type="button" role="tab" data-metric="lifetime">
+          <button class="segmented__item active" type="button" role="tab" aria-selected="true" data-metric="lifetime">
             Global cash
           </button>
-          <button class="segmented__item" type="button" role="tab" data-metric="money">
+          <button class="segmented__item" type="button" role="tab" aria-selected="false" data-metric="money">
             Player cash
           </button>
-          <button class="segmented__item" type="button" role="tab" data-metric="bank">
+          <button class="segmented__item" type="button" role="tab" aria-selected="false" data-metric="bank">
             Bank deposits
+          </button>
+        </div>
+      </div>
+
+      <!-- Toolbar: time range + y-axis scale -->
+      <div class="market__toolbar">
+        <div class="market__ranges segmented" role="tablist" aria-label="Time range">
+          <button class="segmented__item" type="button" role="tab" data-range="5m">5m</button>
+          <button class="segmented__item" type="button" role="tab" data-range="15m">15m</button>
+          <button class="segmented__item" type="button" role="tab" data-range="1h">1H</button>
+          <button class="segmented__item" type="button" role="tab" data-range="6h">6H</button>
+          <button class="segmented__item active" type="button" role="tab" data-range="1d">1D</button>
+          <button class="segmented__item" type="button" role="tab" data-range="5d">5D</button>
+          <button class="segmented__item" type="button" role="tab" data-range="max">Max</button>
+        </div>
+
+        <div class="market__scales segmented" role="tablist" aria-label="Chart scale">
+          <button class="segmented__item active" type="button" role="tab" data-scale="linear"
+                  title="Linear price axis">
+            Linear
+          </button>
+          <button class="segmented__item" type="button" role="tab" data-scale="log"
+                  title="Logarithmic price axis">
+            Log
+          </button>
+          <button class="segmented__item" type="button" role="tab" data-scale="percent"
+                  title="Percent change from the start of the range">
+            %
           </button>
         </div>
       </div>
@@ -95,20 +128,40 @@
         <div class="market__tooltip" data-tooltip hidden></div>
       </div>
 
-      <!-- Range selector -->
-      <div class="market__ranges segmented" role="tablist" aria-label="Time range">
-        <button class="segmented__item" type="button" role="tab" data-range="1">1H</button>
-        <button class="segmented__item" type="button" role="tab" data-range="6">6H</button>
-        <button class="segmented__item active" type="button" role="tab" data-range="24">24H</button>
-        <button class="segmented__item" type="button" role="tab" data-range="168">7D</button>
-        <button class="segmented__item" type="button" role="tab" data-range="100000">All</button>
-      </div>
+      <!-- Summary stats, quote-page style -->
+      <dl class="market__stats">
+        <div class="market__stat">
+          <dt>Previous close</dt>
+          <dd data-stat="prevClose">—</dd>
+        </div>
+        <div class="market__stat">
+          <dt>Open</dt>
+          <dd data-stat="open">—</dd>
+        </div>
+        <div class="market__stat">
+          <dt>Day's range</dt>
+          <dd data-stat="dayRange">—</dd>
+        </div>
+        <div class="market__stat">
+          <dt>Range low – high</dt>
+          <dd data-stat="range">—</dd>
+        </div>
+        <div class="market__stat">
+          <dt>Change / min</dt>
+          <dd data-stat="perMinute">—</dd>
+        </div>
+        <div class="market__stat">
+          <dt>Last tick</dt>
+          <dd data-stat="lastTick">—</dd>
+        </div>
+      </dl>
 
       <p class="market__note">
         <strong>Global cash</strong> is the sum of every player's lifetime
         earnings — it only ever rises. <strong>Player cash</strong> is the
         money currently in every wallet; it falls when players buy from the
-        game. Gems and other assets aren't counted.
+        game. Gems and other assets aren't counted. The quote ticks about once
+        a second; longer ranges are drawn from snapshots taken every 10 minutes.
       </p>
     </section>
 

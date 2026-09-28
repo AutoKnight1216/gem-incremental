@@ -29,7 +29,7 @@ assert.equal(largeMoney(1e18), "$1.0Qi");
 const css = readFileSync(new URL("../global-cash-graph/graph.css", import.meta.url), "utf8");
 assert.match(css, /\.market__status\[hidden\],\s*\.market__tooltip\[hidden\]\s*\{\s*display: none;/);
 const graph = readFileSync(new URL("../global-cash-graph/graph.js", import.meta.url), "utf8");
-assert.match(graph, /chartBounds\(values\)/);
+assert.match(graph, /fitBounds\(values\.concat\(base\)\)/);
 assert.match(graph, /if \(id !== requestId\) return;/);
 assert.match(graph, /rows\.map\(\(r\) => r\[metric\]\)/);
 console.log("Cash chart display checks passed.");
