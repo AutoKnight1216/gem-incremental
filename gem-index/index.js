@@ -281,6 +281,7 @@ function formatDate(value) {
 
 function availabilityLabels(gem) {
   const labels = [];
+  if (gem.metadata?.indexMarker) labels.push(String(gem.metadata.indexMarker));
   const status = availabilityState(gem);
   const statusText = {
     available: "Available now",

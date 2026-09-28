@@ -1,0 +1,26 @@
+.recap--month-two{--m1:#8e87a6;--m2:#a9d8ff;--m2-bright:#d7c9ff}
+.recap-hero--two{position:relative;overflow:hidden;background:radial-gradient(ellipse at 50% 30%,#6c9aff26,transparent 68%)}
+.recap-hero--two>*:not(.recap-hero__crystals){position:relative;z-index:2}
+.recap-hero__crystals i{position:absolute;top:8%;bottom:5%;width:30%;border:1px solid #9ebfff22;background:linear-gradient(140deg,#7868ce18,#79cfff08);clip-path:polygon(50% 0,100% 28%,80% 100%,10% 76%,0 25%)}
+.recap-hero__crystals i:first-child{left:7%;transform:rotate(-10deg)}
+.recap-hero__crystals i:last-child{right:7%;transform:rotate(10deg) scaleX(-1)}
+.recap--month-two h1 span,.recap--month-two .eyebrow,.recap--month-two #recap-status{color:var(--m2)}
+#replay-intro{margin-top:12px;padding:8px 12px;font-size:.82rem}
+.comparison-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(235px,1fr));gap:14px;margin-top:20px}
+.comparison-card{padding:22px;border:1px solid #91bfff31;border-radius:18px;background:linear-gradient(135deg,#6f61a30a,#65b9ff0d)}
+.comparison-card h3{margin:0 0 15px;color:var(--m2);font-size:.92rem}
+.comparison-values{display:grid;grid-template-columns:1fr auto 1fr;align-items:center;gap:10px}
+.comparison-values span{display:block;font-size:.7rem;letter-spacing:.12em;color:var(--m1)}
+.comparison-values strong{display:block;margin-top:5px;font-size:clamp(1.15rem,3vw,1.65rem);font-variant-numeric:tabular-nums}
+.comparison-values .month-one-value{color:var(--m1);font-weight:600}
+.comparison-values .month-two-value{color:#f3f8ff}
+.comparison-arrow{color:var(--m2);font-size:1.25rem}
+.movement{display:flex;align-items:center;gap:12px;flex-wrap:wrap;font-variant-numeric:tabular-nums}
+.movement__old{color:var(--m1)}.movement__new{color:var(--m2-bright);font-size:1.25em}.movement__delta{color:#83e3b0;font-size:.8rem}.movement__delta.is-down{color:#ffaaa8}.movement__delta.is-flat{color:#b8b2c8}
+.record-verdict{display:inline-block;margin-top:10px;padding:5px 8px;border-radius:999px;background:#7d6eff1d;color:#c8bfff;font-size:.68rem;font-weight:800;letter-spacing:.1em}
+.record-verdict--new{background:#4fbb8c22;color:#9ef2c7}.record-verdict--held{background:#c2a15118;color:#f0d68d}
+.recap-transition{margin:70px 0 30px;text-align:center}.recap-transition h2{font-size:clamp(2rem,7vw,4.5rem);letter-spacing:-.04em}.recap-transition p{color:var(--m2)}
+.recap-card--accent{border-color:#9fc8ff66;box-shadow:inset 0 0 35px #786bff0b}
+.recap-upcoming{text-align:center;padding:60px 20px;border:1px solid #9387d85c;border-radius:22px;background:#8e7bff0c}.recap-upcoming strong{display:block;font-size:clamp(2rem,7vw,4rem);margin:12px 0;color:var(--m2)}
+.share-card--two{background:linear-gradient(145deg,#7566bd1c,#65b9ff12);border-color:#a7ccff}
+@media(max-width:520px){.comparison-values{gap:7px}.comparison-card{padding:18px}.recap-hero__crystals i{width:48%;opacity:.55}}
