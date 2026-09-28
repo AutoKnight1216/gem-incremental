@@ -60,6 +60,9 @@ insert into month_one_private.cache values(true,'2026-09-07 16:00+00',true,
 `);
 
 const migration = await fs.readFile(new URL("../supabase/migrations/20260927052133_reusable_recap_month_two_anniversary.sql", import.meta.url), "utf8");
+assert.doesNotMatch(migration, /drop trigger[^;]*recap_period_capture/i,
+  "source trigger installation must not upgrade live-table locks with DROP TRIGGER");
+assert.equal((migration.match(/create or replace trigger recap_period_capture/gi) ?? []).length, 4);
 await db.exec(migration);
 
 assert.equal((await db.query("select count(*)::int n from recap_private.period_personal_baselines where period_id='month-2'")).rows[0].n, 124);

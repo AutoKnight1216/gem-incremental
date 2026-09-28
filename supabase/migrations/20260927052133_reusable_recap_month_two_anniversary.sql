@@ -268,21 +268,21 @@ end $$;
 
 -- Install one reusable set of source triggers. New periods only need a period
 -- row, baselines/reference snapshot, and seed_period(); no Month-N schema fork.
+-- Take the same lock mode CREATE OR REPLACE TRIGGER needs up front. Do not use
+-- DROP TRIGGER here: DROP upgrades this live-table lock to ACCESS EXCLUSIVE and
+-- can deadlock with a roll transaction that has read players and is about to
+-- write it.
 lock table public.players, public.bank_accounts, public.system_account_exclusions,
   public.minigame_scores in share row exclusive mode;
 select recap_private.seed_period('month-2');
 
-drop trigger if exists recap_period_capture on public.players;
-create trigger recap_period_capture after insert or update or delete on public.players
+create or replace trigger recap_period_capture after insert or update or delete on public.players
 for each row execute function recap_private.capture_source('id');
-drop trigger if exists recap_period_capture on public.bank_accounts;
-create trigger recap_period_capture after insert or update or delete on public.bank_accounts
+create or replace trigger recap_period_capture after insert or update or delete on public.bank_accounts
 for each row execute function recap_private.capture_source('player_id');
-drop trigger if exists recap_period_capture on public.system_account_exclusions;
-create trigger recap_period_capture after insert or update or delete on public.system_account_exclusions
+create or replace trigger recap_period_capture after insert or update or delete on public.system_account_exclusions
 for each row execute function recap_private.capture_source('player_id');
-drop trigger if exists recap_period_capture on public.minigame_scores;
-create trigger recap_period_capture after insert or update or delete on public.minigame_scores
+create or replace trigger recap_period_capture after insert or update or delete on public.minigame_scores
 for each row execute function recap_private.capture_source('run_id');
 
 -- Best-effort historical candidate bootstrap. These operational tables are
