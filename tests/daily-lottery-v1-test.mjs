@@ -4,14 +4,15 @@ import test from "node:test";
 
 const read = (path) => fs.readFileSync(new URL(`../${path}`, import.meta.url), "utf8");
 const sql = read("supabase/migrations/20260927081530_daily_lottery_v1.sql");
+const resultDetailsSql = read("supabase/migrations/20260928143421_expose_lottery_result_details.sql");
 const client = read("src/backend/cloudLottery.js");
 const page = read("lottery/lottery.js");
 const html = read("lottery/index.html");
 const shell = read("src/ui/shell.js");
 const economy = read("admin/economy.js");
 
-const functionBody = (name) => {
-  const match = sql.match(new RegExp(`create function public\\.${name}\\([\\s\\S]*?\\nend \\$\\$;`));
+const functionBody = (name, source = sql) => {
+  const match = source.match(new RegExp(`create(?: or replace)? function public\\.${name}\\([\\s\\S]*?\\nend \\$\\$;`));
   assert.ok(match, `${name} must exist`);
   return match[0];
 };
@@ -140,15 +141,23 @@ test("settlement is retry-safe, concurrency-safe, credits offline winner, and re
   assert.doesNotMatch(settle, /record_fee|burn_player_money|insert into public\.economy_cash_ledger/);
 });
 
-test("public APIs contain required information but no pool, odds, or private audit response keys", () => {
-  const dashboard = functionBody("get_daily_lottery");
+test("public APIs keep the live draw private and expose requested completed-result details", () => {
+  const dashboard = functionBody("get_daily_lottery", resultDetailsSql);
   for (const key of ["ticketPrice","ownTickets","activityBand","serverNow","recentResults","walletBalance","bankBalance"]) {
     assert.match(dashboard,new RegExp(`'${key}'`));
   }
-  for (const leaked of ["totalTickets","grossRevenue","payoutBasisPoints","winningInteger","winnerTicketCount","effectiveBurn","uniqueParticipants"]) {
+  for (const key of ["totalTickets","winningTicketNumber","winnerCost","profit","profitPercent"]) {
+    assert.match(dashboard,new RegExp(`'${key}'`));
+  }
+  for (const leaked of ["grossRevenue","payoutBasisPoints","winnerTicketCount","effectiveBurn","uniqueParticipants"]) {
     assert.doesNotMatch(dashboard,new RegExp(`'${leaked}'`));
   }
+  assert.match(dashboard,/where status='settled' order by draw_date desc limit 10/);
+  assert.match(dashboard,/winner_ticket_count::numeric\*d\.ticket_price/);
   assert.doesNotMatch(page,/odds|1 in|jackpot/i);
+  for (const label of ["Expand more","Number of tickets","Winning ticket number","Winner cost","Profit"]) {
+    assert.match(page,new RegExp(label));
+  }
   assert.match(html,/\+1[\s\S]*\+10[\s\S]*\+100[\s\S]*\+1,000[\s\S]*Custom/);
   assert.doesNotMatch(html,/>MAX</i);
 });

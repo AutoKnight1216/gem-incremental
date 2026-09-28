@@ -9,6 +9,7 @@ const migration = fs.readFileSync(new URL("../supabase/migrations/20260927081530
   // separately requires the production pgcrypto call and rejection sampling.
   .replace("create extension if not exists pgcrypto with schema extensions;", "")
   .replace(/do \$capture_cash_guard\$[\s\S]*?end \$capture_cash_guard\$;/, "");
+const resultDetailsMigration = fs.readFileSync(new URL("../supabase/migrations/20260928143421_expose_lottery_result_details.sql", import.meta.url), "utf8");
 
 const PLAYER = "11111111-1111-4111-8111-111111111111";
 const OTHER = "22222222-2222-4222-8222-222222222222";
@@ -53,8 +54,34 @@ async function setup() {
     select set_config('request.jwt.claim.sub','${PLAYER}',false);
   `);
   await db.exec(migration);
+  await db.exec(resultDetailsMigration);
   return db;
 }
+
+test("completed results expose expanded totals and winner profit without leaking the live total", async () => {
+  const db = await setup();
+  try {
+    await db.exec(`delete from public.lottery_draws;
+      insert into public.lottery_draws(id,draw_date,open_at,cutoff_at,draw_at,next_open_at,status,payout_basis_points)
+      values('TEST-LIVE',current_date,now()-interval '1 hour',now()+interval '1 hour',now()+interval '2 hours',now()+interval '2 hours 5 minutes','open',8500);
+      insert into public.lottery_draws(id,draw_date,open_at,cutoff_at,draw_at,next_open_at,status,payout_basis_points,
+        total_tickets,unique_participants,gross_revenue,winning_integer,winner_id,winner_username,winner_ticket_count,
+        final_prize,effective_burn,final_activity_band,settlement_reference,settled_at)
+      values('TEST-HISTORY',current_date-1,now()-interval '2 days',now()-interval '1 day 10 minutes',now()-interval '1 day 5 minutes',now()-interval '1 day',
+        'settled',8500,42,3,420000,17,'${OTHER}','OfflineWinner',5,357000,63000,'The lottery is just getting started.','lottery-settlement:TEST-HISTORY',now()-interval '1 day');`);
+    const payload = (await db.query("select public.get_daily_lottery() result")).rows[0].result;
+    assert.equal(Object.hasOwn(payload,"totalTickets"),false);
+    assert.equal(Object.hasOwn(payload,"winningTicketNumber"),false);
+    const result = payload.recentResults[0];
+    assert.equal(Number(result.totalTickets),42);
+    assert.equal(Number(result.winningTicketNumber),17);
+    assert.equal(Number(result.winnerCost),50000);
+    assert.equal(Number(result.profit),307000);
+    assert.equal(Number(result.profitPercent),614);
+  } finally {
+    await db.close();
+  }
+});
 
 test("migration parses and wallet/bank purchases commit allocations, balances, and one sink entry each", async () => {
   const db = await setup();
