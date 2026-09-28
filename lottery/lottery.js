@@ -17,6 +17,11 @@ const ticketsAfter = (current, added) => {
   try { return exactTickets(BigInt(String(current ?? 0)) + BigInt(added)); }
   catch { return exactTickets(Number(current || 0) + added); }
 };
+const formatProfitPercent = (value) => {
+  const amount = Number(value);
+  if (!Number.isFinite(amount)) return "—";
+  return `${amount.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}%`;
+};
 let data = null;
 let busy = false;
 let serverOffset = 0;
@@ -81,7 +86,18 @@ function renderStatus() {
 function renderResults() {
   const rows = data?.recentResults || [];
   $("recentResults").innerHTML = rows.length
-    ? `<ol class="lottery-history">${rows.map((row) => `<li><time datetime="${escapeHtml(row.date)}">${new Date(`${row.date}T12:00:00`).toLocaleDateString(undefined,{day:"numeric",month:"short"})}</time><span>${row.hadWinner ? `<strong>${escapeHtml(row.winnerUsername)}</strong> won <strong>${formatMoney(row.prize, { exact: true })}</strong>` : "No tickets were purchased."}</span></li>`).join("")}</ol>`
+    ? `<ol class="lottery-history">${rows.map((row) => `<li>
+      <div class="lottery-result-summary"><time datetime="${escapeHtml(row.date)}">${new Date(`${row.date}T12:00:00`).toLocaleDateString(undefined,{day:"numeric",month:"short"})}</time><span>${row.hadWinner ? `<strong>${escapeHtml(row.winnerUsername)}</strong> won <strong>${formatMoney(row.prize, { exact: true })}</strong>` : "No tickets were purchased."}</span></div>
+      <details class="lottery-result-details">
+        <summary>Expand more</summary>
+        <dl>
+          <div><dt>Number of tickets</dt><dd>${exactTickets(row.totalTickets)}</dd></div>
+          <div><dt>Winning ticket number</dt><dd>${row.hadWinner ? exactTickets(row.winningTicketNumber) : "—"}</dd></div>
+          <div><dt>Winner cost</dt><dd>${row.hadWinner ? formatMoney(row.winnerCost, { exact: true }) : "—"}</dd></div>
+          <div><dt>Profit</dt><dd>${row.hadWinner ? `${formatMoney(row.profit, { exact: true })} (${formatProfitPercent(row.profitPercent)})` : "—"}</dd></div>
+        </dl>
+      </details>
+    </li>`).join("")}</ol>`
     : `<p class="lottery-empty">No completed draws yet.</p>`;
 }
 
