@@ -10,6 +10,7 @@ const migration = fs.readFileSync(new URL("../supabase/migrations/20260927081530
   .replace("create extension if not exists pgcrypto with schema extensions;", "")
   .replace(/do \$capture_cash_guard\$[\s\S]*?end \$capture_cash_guard\$;/, "");
 const resultDetailsMigration = fs.readFileSync(new URL("../supabase/migrations/20260928143421_expose_lottery_result_details.sql", import.meta.url), "utf8");
+const randomizedRangesMigration = fs.readFileSync(new URL("../supabase/migrations/20260928145656_randomized_lottery_ranges.sql", import.meta.url), "utf8");
 
 const PLAYER = "11111111-1111-4111-8111-111111111111";
 const OTHER = "22222222-2222-4222-8222-222222222222";
@@ -27,7 +28,7 @@ async function setup() {
       select nullif(current_setting('request.jwt.claim.sub',true),'')::uuid
     $$;
     create function extensions.gen_random_bytes(integer) returns bytea language sql volatile as $$
-      select decode('01020304050607','hex')
+      select decode(substr(md5(random()::text)||md5(random()::text),1,$1*2),'hex')
     $$;
     create table auth.users(id uuid primary key);
     create table public.players(id uuid primary key references auth.users(id),username text not null,money numeric not null default 0,lifetime_earnings numeric not null default 0);
@@ -55,6 +56,7 @@ async function setup() {
   `);
   await db.exec(migration);
   await db.exec(resultDetailsMigration);
+  await db.exec(randomizedRangesMigration);
   return db;
 }
 
@@ -129,9 +131,10 @@ test("settlement handles zero/one-ticket draws, pays offline once, and never cre
       insert into public.lottery_draws(id,draw_date,open_at,cutoff_at,draw_at,next_open_at,status,payout_basis_points,total_tickets,unique_participants,gross_revenue)
       values
       ('TEST-ZERO',current_date-1,now()-interval '1 day',now()-interval '10 minutes',now()-interval '5 minutes',now()-interval '1 minute','locked',8000,0,0,0),
-      ('TEST-ONE',current_date,now()-interval '1 day',now()-interval '10 minutes',now()-interval '5 minutes',now()-interval '1 minute','locked',8500,1,1,10000);
+      ('TEST-ONE',current_date,now()-interval '1 day',now()-interval '10 minutes',now()-interval '5 minutes',now()-interval '1 minute','open',8500,1,1,10000);
       insert into public.lottery_allocations(draw_id,player_id,ticket_count,purchase_total)
-      values('TEST-ONE','${OTHER}',1,10000);`);
+      values('TEST-ONE','${OTHER}',1,10000);
+      update public.lottery_draws set status='locked' where id='TEST-ONE';`);
     const zero = (await db.query("select public.settle_lottery_draw('TEST-ZERO') result")).rows[0].result;
     assert.equal(zero.winner,null);
     assert.equal(Number(zero.prize),0);
@@ -159,6 +162,48 @@ test("settlement handles zero/one-ticket draws, pays offline once, and never cre
     assert.equal(Number(audit.final_prize),9000);
     assert.equal(Number(audit.effective_burn),1000);
     assert.equal(audit.final_activity_band,"The lottery is just getting started.");
+  } finally {
+    await db.close();
+  }
+});
+
+test("settlement freezes a private random order with exact contiguous ranges", async () => {
+  const db = await setup();
+  try {
+    const THIRD = "33333333-3333-4333-8333-333333333333";
+    await db.exec(`delete from public.lottery_draws;
+      insert into auth.users values('${THIRD}');
+      insert into public.players(id,username,money,lifetime_earnings) values('${THIRD}','ThirdEntrant',0,0);
+      insert into public.lottery_draws(id,draw_date,open_at,cutoff_at,draw_at,next_open_at,status,payout_basis_points)
+      values('TEST-RANGES',current_date,now()-interval '1 day',now()-interval '10 minutes',now()-interval '5 minutes',now()-interval '1 minute','locked',8500);
+      update public.lottery_draws set status='open' where id='TEST-RANGES';
+      insert into public.lottery_allocations(draw_id,player_id,ticket_count,purchase_total) values
+        ('TEST-RANGES','${PLAYER}',3,30000),
+        ('TEST-RANGES','${OTHER}',5,50000),
+        ('TEST-RANGES','${THIRD}',7,70000);
+      update public.lottery_draws set status='locked' where id='TEST-RANGES';`);
+
+    await db.query("select public.settle_lottery_draw('TEST-RANGES')");
+    const ranges = (await db.query(`select player_id,settlement_order_key,settlement_position,range_start,range_end,ticket_count,finalized_at
+      from public.lottery_allocations where draw_id='TEST-RANGES' order by settlement_position`)).rows;
+    assert.equal(ranges.length,3);
+    assert.ok(ranges.every(row => row.settlement_order_key && row.finalized_at));
+    assert.deepEqual(ranges.map(row => Number(row.settlement_position)),[1,2,3]);
+    assert.equal(Number(ranges[0].range_start),1);
+    assert.equal(Number(ranges.at(-1).range_end),15);
+    for (let index=0; index<ranges.length; index+=1) {
+      const row = ranges[index];
+      assert.equal(Number(row.range_end)-Number(row.range_start)+1,Number(row.ticket_count));
+      if (index>0) assert.equal(Number(row.range_start),Number(ranges[index-1].range_end)+1);
+    }
+    const draw = (await db.query("select winning_integer,winner_id from public.lottery_draws where id='TEST-RANGES'")).rows[0];
+    const winnerRange = ranges.find(row => row.player_id===draw.winner_id);
+    assert.ok(Number(draw.winning_integer)>=Number(winnerRange.range_start));
+    assert.ok(Number(draw.winning_integer)<=Number(winnerRange.range_end));
+    await assert.rejects(
+      db.query("update public.lottery_allocations set range_start=range_start+1 where draw_id='TEST-RANGES'"),
+      /lottery_allocation_finalized/
+    );
   } finally {
     await db.close();
   }

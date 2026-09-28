@@ -5,6 +5,7 @@ import test from "node:test";
 const read = (path) => fs.readFileSync(new URL(`../${path}`, import.meta.url), "utf8");
 const sql = read("supabase/migrations/20260927081530_daily_lottery_v1.sql");
 const resultDetailsSql = read("supabase/migrations/20260928143421_expose_lottery_result_details.sql");
+const randomizedRangesSql = read("supabase/migrations/20260928145656_randomized_lottery_ranges.sql");
 const client = read("src/backend/cloudLottery.js");
 const page = read("lottery/lottery.js");
 const html = read("lottery/index.html");
@@ -99,6 +100,20 @@ test("secure weighted selection is stable, equal per ticket, and covers zero/one
   assert.equal(selectWinner([{player:"only",tickets:1}],1),"only");
   assert.equal(selectWinner([],1),null);
   assert.match(sql, /if v_total=0 then[\s\S]*winner_id=null[\s\S]*final_prize=0/);
+});
+
+test("settlement privately randomizes and freezes entrant ranges independently of UUID order", () => {
+  const settle = functionBody("settle_lottery_draw", randomizedRangesSql);
+  assert.match(randomizedRangesSql, /add column settlement_order_key bytea/);
+  assert.match(randomizedRangesSql, /add column settlement_position integer/);
+  assert.match(randomizedRangesSql, /add column range_start bigint/);
+  assert.match(randomizedRangesSql, /add column range_end bigint/);
+  assert.match(settle, /extensions\.gen_random_bytes\(16\) settlement_order_key/);
+  assert.match(settle, /row_number\(\) over\(order by settlement_order_key,player_id\)/);
+  assert.match(settle, /v_winning := lottery_private\.secure_random_bigint\(v_total\)/);
+  assert.match(settle, /v_winning between a\.range_start and a\.range_end/);
+  assert.doesNotMatch(settle, /sum\(a\.ticket_count\) over\(order by a\.player_id/);
+  assert.match(randomizedRangesSql, /lottery_allocation_finalized/);
 });
 
 test("payout uses bounded precommitted constant and deterministic half-up thousand rounding", () => {
