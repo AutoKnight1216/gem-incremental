@@ -19,11 +19,15 @@ await db.exec(`
   create role anon;
   create role authenticated;
   create role service_role;
+  create schema auth;
+  create function auth.uid() returns uuid language sql stable as
+    $$select nullif(current_setting('request.jwt.claim.sub', true), '')::uuid$$;
   create table public.players(
     id uuid primary key,
     username text,
     money double precision not null default 0,
-    lifetime_earnings double precision not null default 0
+    lifetime_earnings double precision not null default 0,
+    total_rolls bigint not null default 0
   );
   create table public.inventory_gems(
     id bigint primary key,
@@ -52,9 +56,23 @@ await db.exec(`
     shop_price numeric
   );
   create table public.game_recipes(id text primary key, recipe jsonb not null);
+  create table public.crafting_progress(
+    player_id uuid not null,
+    recipe_id text not null,
+    progress jsonb not null default '{}'::jsonb,
+    primary key(player_id, recipe_id)
+  );
+  create table public.player_consumables(
+    player_id uuid not null,
+    consumable_id text not null,
+    quantity integer not null default 0,
+    updated_at timestamptz,
+    primary key(player_id, consumable_id)
+  );
   create table public.global_cash_events(player_name text, gem_name text, amount double precision);
   create function public.equipment_gem_sell_multiplier(uuid) returns numeric language sql stable as $$select 1::numeric$$;
   insert into public.players(id, username) values ('${playerId}', 'Potion Tester');
+  select set_config('request.jwt.claim.sub', '${playerId}', false);
 `);
 
 await db.exec(migration);
@@ -113,6 +131,66 @@ assert.equal(Number(recipes[1].recipe.reward.effectValue), 1.25);
 assert.deepEqual(
   recipes[1].recipe.requirements.find((requirement) => requirement.consumableId === "money-up-potion"),
   { type: "consumable", consumableId: "money-up-potion", amount: 3 }
+);
+
+await db.query("update public.players set money = 1000000 where id = $1", [playerId]);
+await db.query(`
+  insert into public.player_consumables(player_id, consumable_id, quantity, updated_at)
+  values
+    ($1, 'lucky-potion-1', 5, now()),
+    ($1, 'fortune-potion-1', 5, now()),
+    ($1, 'lucky-potion-2', 5, now()),
+    ($1, 'fortune-potion-2', 5, now())
+`, [playerId]);
+
+const tierOneCraft = (await db.query(
+  "select public.craft_consumable_recipe('money-up-potion') as result"
+)).rows[0].result;
+assert.equal(tierOneCraft.success, true);
+assert.equal(tierOneCraft.consumableId, "money-up-potion");
+assert.equal(
+  (await db.query("select count(*)::integer as count from public.crafting_progress where player_id = $1", [playerId])).rows[0].count,
+  0,
+  "consumable-only recipes must craft without a deposited-progress row"
+);
+
+await db.query(`
+  update public.player_consumables
+  set quantity = 3
+  where player_id = $1 and consumable_id = 'money-up-potion'
+`, [playerId]);
+const tierTwoCraft = (await db.query(
+  "select public.craft_consumable_recipe('money-up-potion-2') as result"
+)).rows[0].result;
+assert.equal(tierTwoCraft.success, true);
+assert.equal(tierTwoCraft.consumableId, "money-up-potion-2");
+assert.equal(
+  Number((await db.query("select money from public.players where id = $1", [playerId])).rows[0].money),
+  875000,
+  "both recipe costs must be charged"
+);
+assert.equal(
+  Number((await db.query("select quantity from public.player_consumables where player_id = $1 and consumable_id = 'money-up-potion'", [playerId])).rows[0].quantity),
+  0,
+  "Money Up Potion II must consume three Tier I potions"
+);
+
+await db.query(`
+  insert into public.game_recipes(id, recipe)
+  values (
+    'gem-gated-potion',
+    '{
+      "id": "gem-gated-potion",
+      "requirements": [{"type": "gem-count", "gem": "Quartz", "amount": 1}],
+      "moneyCost": 0,
+      "reward": {"type": "consumable", "id": "gem-gated-potion"}
+    }'::jsonb
+  )
+`);
+await assert.rejects(
+  db.query("select public.craft_consumable_recipe('gem-gated-potion')"),
+  /requirements_not_met/,
+  "missing progress must not bypass deposited gem requirements"
 );
 
 await db.close();
