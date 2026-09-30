@@ -1,4 +1,15 @@
 import { planIncludedMaterial } from './equipmentMaterials.js';
+
+export function ownsCraftedEquipment(recipe, equipment = []) {
+  if (!recipe?.id) return false;
+
+  return equipment.some((item) => {
+    const equipmentId = item?.equipment_id ?? item?.id;
+    return equipmentId === recipe.id ||
+      (recipe.id === "omnidimensional-vault" && equipmentId === "dimensional-vault");
+  });
+}
+
 export function createCraftingState() {
   return {
     activeAutoCraftRecipeId: null,

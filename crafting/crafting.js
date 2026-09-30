@@ -6,7 +6,8 @@ import { getConsumableById } from "../src/data/consumables.js";
 import {
   createCraftingState,
   ensureRecipeProgress,
-  isRequirementComplete
+  isRequirementComplete,
+  ownsCraftedEquipment
 } from "../src/logic/crafting.js";
 
 import {
@@ -163,16 +164,8 @@ function ownsEquipment(equipmentId) {
 }
 
 
-function ownsTierOrHigher(category, tier) {
-  return state.equipment.some(
-    (item) => item.category === category && Number(item.tier) >= tier
-  );
-}
-
-
 function ownsRecipe(recipe) {
- return recipe.horizontal || recipe.craftingTab === 'toys' || (recipe.category === 'pickaxe' && recipe.reward.tier === 15)
-   ? ownsEquipment(recipe.id) : ownsTierOrHigher(recipe.reward.category,recipe.reward.tier);
+  return ownsCraftedEquipment(recipe, state.equipment);
 }
 
 // The logic module expects a plain { id } shape.
