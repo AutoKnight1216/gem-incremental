@@ -14,7 +14,8 @@ import { getSettings } from "../src/ui/settings.js";
 import { rarityTier, rarityLabel, formatMoney, formatWeight, formatCount, escapeHtml } from "../src/ui/format.js";
 import {
   availabilityState, canonicalMutationIds, canonicalMutationKey, dailyWindows,
-  indexCombinationRecords, mutationCombinationIsObtainable, mutationSourceLabel,
+  gemEventSourceLabel, indexCombinationRecords, isLimitedEventGem,
+  mutationCombinationIsObtainable, mutationSourceLabel,
   rawCombinationDenominator
 } from "../src/logic/gemIndex.js";
 
@@ -38,8 +39,9 @@ const PAGE_SIZE = 1000;
 const BAND_PAGE_SIZE = 24;
 const RARITY_BAND_ORDER = Object.freeze([
   "common", "uncommon", "rare", "epic", "legendary", "mythic", "exotic",
-  "exalted", "cosmic", "transcendent", "secret", "anomalous"
+  "exalted", "cosmic", "transcendent", "secret", "limited", "anomalous"
 ]);
+const LIMITED_TIER = Object.freeze({ id: "limited", name: "Limited" });
 
 let mutationList = [];
 let mutationById = new Map();
@@ -109,8 +111,12 @@ function isSecretLocked(entry) {
   return isSecretGem(entry.gem) && !identityDiscovered(entry);
 }
 
-function displayTier(entry) {
+function baseTier(entry) {
   return rarityTier(entry.gem.rarity, entry.gem.name);
+}
+
+function displayTier(entry) {
+  return isLimitedEventGem(entry.gem) ? LIMITED_TIER : baseTier(entry);
 }
 
 async function loadCombinations(playerId) {
@@ -300,9 +306,8 @@ function availabilityLabels(gem) {
   if (gem.startsAt || gem.endsAt) {
     labels.push(`${gem.startsAt ? `Starts ${formatDate(gem.startsAt)}` : ""}${gem.startsAt && gem.endsAt ? " · " : ""}${gem.endsAt ? `Ends ${formatDate(gem.endsAt)}` : ""}`);
   }
-  if (gem.availabilityMode === "global_event" || gem.requiredEventKey) {
-    labels.push(`Requires global event${gem.requiredEventKey ? `: ${gem.requiredEventKey.replaceAll("_", " ")}` : ""}`);
-  }
+  const eventSource = gemEventSourceLabel(gem);
+  if (eventSource) labels.push(eventSource);
   if (gem.metadata?.deepcore_stage) {
     labels.push(`Deepcore phase ${String(gem.metadata.deepcore_stage).replace(/^5([12])$/, "5.$1")}${gem.metadata.deepcore_route ? ` · ${gem.metadata.deepcore_route} route` : ""}`);
   }
@@ -329,8 +334,13 @@ function availabilityHtml(gem) {
     .join("");
 }
 
+function eventSourceHtml(gem) {
+  const label = gemEventSourceLabel(gem);
+  return label ? `<p class="index-card__availability">${escapeHtml(label)}</p>` : "";
+}
+
 function revealedCard(entry, record) {
-  const tier = displayTier(entry);
+  const tier = baseTier(entry);
   const baseValue = Number(entry.gem.baseWeight) * Number(entry.gem.valuePerGram);
   const style = getGemStyle(entry.gem.name);
   const replayable = record && isCutsceneEligible({
@@ -362,11 +372,11 @@ function gemCard(entry) {
   const record = discoveredRecord(entry);
   if (identityDiscovered(entry)) return revealedCard(entry, record);
   const secret = isSecretLocked(entry);
-  const tier = displayTier(entry);
+  const tier = baseTier(entry);
   return `<article class="index-card index-card--locked${secret ? " index-card--secret" : ""} tier-${escapeHtml(tier.id)}" data-combination="${escapeHtml(entry.combinationKey)}">
     <div class="index-card__head"><div><div class="index-card__name">???</div><div class="index-card__rarity">${escapeHtml(combinationLabel(entry.mutationIds))}</div></div><span class="badge badge--tier">${escapeHtml(tier.name)}</span></div>
     <p class="index-card__hidden">${secret ? "This secret gem is hidden until discovered." : "Discover this gem to reveal its index entry."}</p>
-    ${secret ? "" : availabilityHtml(entry.gem)}
+    ${secret ? eventSourceHtml(entry.gem) : availabilityHtml(entry.gem)}
     <div class="index-card__chance"><span class="index-card__key">Base/raw chance</span><span class="index-card__val">${secret ? "Unknown" : escapeHtml(rawChanceLabel(entry))}</span></div>
   </article>`;
 }
@@ -461,7 +471,7 @@ function renderMutationTabs() {
 function orderedRarityBands(bands) {
   const ascending = RARITY_BAND_ORDER.filter((id) => bands.has(id));
   const ids = gemSort.value === "rarity-desc"
-    ? ["secret", "anomalous", ...ascending.filter((id) => !["secret", "anomalous"].includes(id)).reverse()]
+    ? ["secret", "limited", "anomalous", ...ascending.filter((id) => !["secret", "limited", "anomalous"].includes(id)).reverse()]
     : ascending;
   return new Map(ids.filter((id) => bands.has(id)).map((id) => [id, bands.get(id)]));
 }

@@ -1332,6 +1332,7 @@ a.btn--icon[aria-current="page"] {
 .tier-transcendent { --tier: var(--rarity-transcendent); }
 .tier-anomalous { --tier: #a855f7; }
 .tier-secret { --tier: #ffd36a; }
+.tier-limited { --tier: #ff7aa8; }
 .tier-unknown    { --tier: var(--text-faint); }
 
 .badge--tier {
