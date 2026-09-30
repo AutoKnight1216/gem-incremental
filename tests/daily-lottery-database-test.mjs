@@ -62,7 +62,7 @@ async function setup() {
   return db;
 }
 
-test("live pool and completed result economics are public without exposing current tax", async () => {
+test("live payable pool and completed result economics are public without exposing current tax", async () => {
   const db = await setup();
   try {
     await db.exec(`delete from public.lottery_draws;
@@ -75,7 +75,7 @@ test("live pool and completed result economics are public without exposing curre
         'settled',8500,42,3,420000,17,'${OTHER}','OfflineWinner',5,357000,63000,'The lottery is just getting started.','lottery-settlement:TEST-HISTORY',now()-interval '1 day');`);
     const payload = (await db.query("select public.get_daily_lottery() result")).rows[0].result;
     assert.equal(payload.drawId,"TEST-LIVE");
-    assert.equal(Number(payload.prizePool),1230000);
+    assert.equal(Number(payload.prizePool),1046000);
     assert.equal(Object.hasOwn(payload,"totalTickets"),false);
     assert.equal(Object.hasOwn(payload,"winningTicketNumber"),false);
     assert.equal(Object.hasOwn(payload,"taxPercent"),false);

@@ -75,11 +75,6 @@ function retargetPrizePool(value, drawId) {
   if (poolAnimationFrame == null) poolAnimationFrame = requestAnimationFrame(animatePrizePool);
 }
 
-function addExactMoney(value, added) {
-  try { return (BigInt(String(value ?? 0)) + BigInt(String(added ?? 0))).toString(); }
-  catch { return String(Number(value || 0) + Number(added || 0)); }
-}
-
 function quantity() {
   const value = Number($("ticketQuantity").value);
   return Number.isSafeInteger(value) && value >= 1 && value <= MAX_QUANTITY ? value : 0;
@@ -228,10 +223,10 @@ async function buy() {
     } else {
       notify.success("Tickets purchased", `${exactTickets(result.data.ticketsPurchased)} tickets for ${formatMoney(result.data.cost, { exact: true })}.`);
       data.ownTickets = result.data.ownTickets;
-      data.prizePool = addExactMoney(data.prizePool,result.data.cost);
       data.walletBalance = result.data.walletBalance;
       data.bankBalance = result.data.bankBalance;
       render();
+      await refresh({ quiet: true });
     }
   } finally {
     busy = false;

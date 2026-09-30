@@ -1,6 +1,6 @@
--- Make the live gross prize pool public while keeping the current draw's
--- payout basis points (tax) private. Completed results may disclose the
--- finalized tax percentage after settlement.
+-- Make the live payable prize public while keeping the current draw's payout
+-- basis points (tax) private. The preview uses the exact settlement formula,
+-- including deterministic half-up rounding to the nearest $1,000.
 begin;
 set local check_function_bodies = off;
 
@@ -55,7 +55,8 @@ begin
     into v_unread from public.lottery_draws d where d.status='settled' and d.winner_id=v_uid
       and d.winner_notified_at is null order by d.draw_date desc limit 1;
   return jsonb_build_object('drawId',v_draw.id,'serverNow',v_now,'phase',v_phase,
-    'ticketPrice',v_draw.ticket_price,'prizePool',v_draw.gross_revenue::text,
+    'ticketPrice',v_draw.ticket_price,'prizePool',
+      (floor((((v_draw.gross_revenue*v_draw.payout_basis_points/10000)/1000)+0.5)*1000))::text,
     'salesOpenAt',v_draw.open_at,'cutoffAt',v_draw.cutoff_at,'drawAt',v_draw.draw_at,
     'nextSalesOpenAt',case when v_phase='transition' then v_draw.open_at else v_draw.next_open_at end,
     'ownTickets',v_own,'walletBalance',v_wallet,'bankBalance',v_bank,

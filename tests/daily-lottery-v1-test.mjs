@@ -156,7 +156,7 @@ test("settlement is retry-safe, concurrency-safe, credits offline winner, and re
   assert.doesNotMatch(settle, /record_fee|burn_player_money|insert into public\.economy_cash_ledger/);
 });
 
-test("public APIs expose the live gross pool and finalized result economics without current tax", () => {
+test("public APIs expose the live payable pool and finalized result economics without current tax", () => {
   const dashboard = functionBody("get_daily_lottery", prizePoolSql);
   for (const key of ["drawId","ticketPrice","prizePool","ownTickets","serverNow","recentResults","walletBalance","bankBalance"]) {
     assert.match(dashboard,new RegExp(`'${key}'`));
@@ -174,11 +174,13 @@ test("public APIs expose the live gross pool and finalized result economics with
     assert.match(page,new RegExp(label));
   }
   assert.match(html,/Today's prize pool/);
-  assert.match(html,/Every ticket adds <strong>\$10,000<\/strong>/);
+  assert.match(html,/Tickets cost <strong>\$10,000<\/strong> each/);
   assert.doesNotMatch(html,/pool and odds stay private/i);
   assert.match(page,/POOL_POLL_MS = 5_000/);
   assert.match(page,/requestAnimationFrame\(animatePrizePool\)/);
   assert.match(page,/poolDrawId !== drawId \|\| document\.hidden \|\| prefersReducedMotion\(\)/);
+  assert.match(page,/await refresh\(\{ quiet: true \}\)/);
+  assert.doesNotMatch(page,/data\.prizePool\s*=\s*addExactMoney/);
   assert.doesNotMatch(page,/title = data\.activityBand/);
   assert.match(html,/\+1[\s\S]*\+10[\s\S]*\+100[\s\S]*\+1,000[\s\S]*Custom/);
   assert.doesNotMatch(html,/>MAX</i);
