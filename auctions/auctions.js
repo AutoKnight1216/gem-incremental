@@ -7,23 +7,16 @@ import { loadCloudGems, loadCloudPlayerState } from "../src/backend/cloudInvento
 import { loadCloudConsumables } from "../src/backend/cloudConsumables.js";
 import {
   settleDueAuctions,
-  settleDueMarketOrders,
   loadActiveAuctions,
   loadMyAuctions,
   createAuctionLot,
-  buyAuction,
-  cancelAuction,
-  loadOpenOrders,
-  loadMyOrders,
-  createGemOrder,
-  fulfillGemOrder,
-  cancelGemOrder
+  placeBid,
+  cancelAuction
 } from "../src/backend/cloudAuctions.js";
 import { isRelic } from "../src/data/enchants.js";
 import { getGemMutation } from "../src/data/mutations.js";
 import { getConsumableById } from "../src/data/consumables.js";
-import { loadGemCatalog } from "../src/backend/gemCatalog.js";
-import { saleFeeRate, orderFeeRate, feeAmount } from "./market-fees.js";
+import { listingFeeRate, feeAmount, marginalSellerTax } from "./market-fees.js";
 
 import { icons } from "../src/ui/icons.js";
 import { notify } from "../src/ui/toast.js";
@@ -32,7 +25,7 @@ import { gemNameHtml } from "../src/ui/gemStyle.js";
 import {
   rarityTier,
   rarityLabel,
-  formatMoney,
+  formatMoney as formatBaseMoney,
   formatWeight,
   formatCount,
   escapeHtml
@@ -40,6 +33,11 @@ import {
 
 
 const shell = window.__shell;
+
+function formatMoney(value) {
+  const amount = Math.abs(Number(value) || 0);
+  return formatBaseMoney(value, { decimalPlaces: amount > 0 && amount < 1 ? 4 : 2 });
+}
 
 document.getElementById("refreshIcon").innerHTML = icons.refresh;
 document.getElementById("sellSearchIcon").innerHTML = icons.search;
@@ -52,10 +50,7 @@ document.getElementById("sellSearchIcon").innerHTML = icons.search;
 const state = {
   auctions: [],
   mine: [],
-  orders: [],
-  myOrders: [],
   gems: [],
-  catalog: [],
   consumables: [],
   money: 0,
   userId: null,
@@ -66,8 +61,6 @@ const state = {
 
 const statusEl = document.getElementById("auctionStatus");
 const browseList = document.getElementById("browseList");
-const ordersList = document.getElementById("ordersList");
-const myOrdersList = document.getElementById("myOrdersList");
 const mineList = document.getElementById("mineList");
 const refreshButton = document.getElementById("refreshButton");
 
@@ -80,53 +73,27 @@ const sellPrice = document.getElementById("sellPrice");
 const sellDuration = document.getElementById("sellDuration");
 const listButton = document.getElementById("listButton");
 
-const orderGem = document.getElementById("orderGem");
-const orderPrice = document.getElementById("orderPrice");
-const orderButton = document.getElementById("orderButton");
-const orderFeePreview = document.getElementById("orderFeePreview");
 const sellFeePreview = document.getElementById("sellFeePreview");
-const orderPriceRange = document.getElementById("orderPriceRange");
 const sellPriceMinimum = document.getElementById("sellPriceMinimum");
-const watchGemButton = document.getElementById("watchGemButton");
-const marketWatchlist = document.getElementById("marketWatchlist");
-const WATCHLIST_KEY = "gemIncremental.market.watchlist";
-
-function watches(){try{return JSON.parse(localStorage.getItem(WATCHLIST_KEY)||"[]");}catch{return [];}}
-function saveWatches(value){try{localStorage.setItem(WATCHLIST_KEY,JSON.stringify(value.slice(0,12)));}catch{}}
-function renderWatchlist(){if(!marketWatchlist)return;const list=watches();if(!list.length){marketWatchlist.innerHTML="<h2>Watchlist</h2><p>Watch a gem to see the best current buy order and the median live offer.</p>";return;}const rows=list.map(name=>{const prices=state.orders.filter(o=>o.status==="open"&&o.gem_name===name).map(o=>Number(o.price)).sort((a,b)=>a-b),median=prices.length?prices[Math.floor(prices.length/2)]:0,summary=prices.length?`Best ${formatMoney(prices.at(-1))} · Median ${formatMoney(median)}`:"No open orders";return `<div class="auction-line"><span>${escapeHtml(name)}</span><span>${summary}</span><button class="btn btn--sm" data-unwatch="${escapeHtml(name)}">Remove</button></div>`;}).join("");marketWatchlist.innerHTML=`<div><h2>Watchlist</h2><p>Live order-book benchmarks refresh with the market.</p></div>${rows}`;marketWatchlist.querySelectorAll("[data-unwatch]").forEach(button=>button.addEventListener("click",()=>{saveWatches(watches().filter(name=>name!==button.dataset.unwatch));renderWatchlist();}));}
 
 function formatRate(rate) {
   return `${(rate * 100).toFixed(2).replace(/\.00$/, "")}%`;
 }
 
 function renderFeePreviews() {
-  const order = Math.max(0, Math.floor(Number(orderPrice.value) || 0));
-  const orderRate = orderFeeRate(order);
-  const orderFee = feeAmount(order, orderRate);
-  orderFeePreview.textContent = `Order fee: ${formatMoney(orderFee)} (${formatRate(orderRate)}). The fee is not refunded if the order is cancelled or expires.`;
-
-  const sale = Math.max(0, Math.floor(Number(sellPrice.value) || 0));
+  const startingBid = Math.max(0, Number(sellPrice.value) || 0);
   const hours = Number(sellDuration.value);
-  const saleRate = saleFeeRate(sale, hours);
-  const saleFee = feeAmount(sale, saleRate);
-  sellFeePreview.textContent = `Fee when sold: ${formatMoney(saleFee)} (${formatRate(saleRate)}). You receive ${formatMoney(Math.max(0, sale - saleFee))}.`;
-
-  const range = selectedOrderPriceRange();
-  orderPriceRange.textContent = range
-    ? `Allowed offer: ${formatMoney(range.minimum)}–${formatMoney(range.maximum)} (25%–400% of base value).`
-    : "Choose a gem to see its allowed offer range.";
-
   const listingRange = selectedLotPriceRange();
-  sellPriceMinimum.textContent = listingRange
-    ? `Allowed listing: ${formatMoney(listingRange.minimum)}–${formatMoney(listingRange.maximum)} (25%–100× this lot's reference value).`
-    : "Choose items to see the allowed listing range.";
-}
+  const rate = listingFeeRate(hours);
+  const listingFee = listingRange && rate != null ? feeAmount(listingRange.referenceValue, rate) : 0;
+  const estimatedTax = listingRange ? marginalSellerTax(startingBid, listingRange.referenceValue) : 0;
+  sellFeePreview.textContent = listingRange && rate != null
+    ? `Charged now: ${formatMoney(listingFee)} listing fee (${formatRate(rate)} of R), non-refundable. At the starting bid, estimated seller tax is ${formatMoney(estimatedTax)}.`
+    : "Choose items and a duration to see the listing fee.";
 
-function selectedOrderPriceRange() {
-  const gem = state.catalog?.find((entry) => entry.name === orderGem.value);
-  if (!gem) return null;
-  const baseValue = Math.max(0, Number(gem.baseWeight) * Number(gem.valuePerGram));
-  return { minimum: Math.ceil(baseValue * 0.25), maximum: Math.floor(baseValue * 4) };
+  sellPriceMinimum.textContent = listingRange
+    ? `Reference value R: ${formatMoney(listingRange.referenceValue)}. Starting bid: ${formatMoney(listingRange.minimum)}–${formatMoney(listingRange.maximum)} (0.5×–10× R).`
+    : "Choose items to see the server-verified reference range.";
 }
 
 function selectedLotPriceRange() {
@@ -141,8 +108,9 @@ function selectedLotPriceRange() {
   }
   if (state.lot.gems.size === 0 && state.lot.potions.size === 0) return null;
   return {
-    minimum: Math.max(1, Math.ceil(referenceValue * 0.25)),
-    maximum: Math.floor(referenceValue * 100)
+    referenceValue,
+    minimum: referenceValue * 0.5,
+    maximum: referenceValue * 10
   };
 }
 
@@ -153,7 +121,6 @@ function selectedLotPriceRange() {
 
 const TABS = [
   { id: "browse", tab: "browseTab", section: "browseSection" },
-  { id: "orders", tab: "ordersTab", section: "ordersSection" },
   { id: "sell", tab: "sellTab", section: "sellSection" },
   { id: "mine", tab: "mineTab", section: "mineSection" }
 ];
@@ -172,7 +139,6 @@ function selectTab(active) {
     section.classList.toggle("hidden", !on);
   }
   if (active === "sell") renderSell();
-  if (active === "orders") renderOrders();
   if (active === "mine") renderMine();
 }
 
@@ -296,7 +262,7 @@ function startTicker() {
 
 
 // =========================================================
-// BROWSE (buy now)
+// BROWSE AUCTIONS
 // =========================================================
 
 function renderBrowse() {
@@ -305,22 +271,28 @@ function renderBrowse() {
   if (live.length === 0) {
     browseList.innerHTML = `
       <div class="empty" style="grid-column:1/-1">${icons.gavel}
-        <p class="empty__title">Nothing for sale right now</p>
-        <p>List something from the “Sell” tab, or post an order under “Orders”.</p>
+        <p class="empty__title">No live auctions right now</p>
+        <p>Create one from the “Sell” tab.</p>
       </div>`;
     return;
   }
   browseList.innerHTML = live.map(browseCard).join("");
-  for (const card of browseList.querySelectorAll(".auction-card")) wireBuyCard(card);
+  for (const card of browseList.querySelectorAll(".auction-card")) wireBidCard(card);
   startTicker();
 }
 
 function browseCard(auction) {
   const mine = auction.seller_id === state.userId;
-  const price = Number(auction.start_price);
-  const affordable = state.money >= price;
+  const referenceValue = Number(auction.lot_reference_value);
+  const currentBid = auction.current_bid == null ? null : Number(auction.current_bid);
+  const bidCount = Number(auction.bid_count ?? 0);
+  const minimum = currentBid == null ? Number(auction.start_price) : currentBid + referenceValue * 0.1;
+  const maximum = currentBid == null ? Number(auction.start_price) : currentBid + referenceValue * 25;
+  const affordable = state.money >= minimum;
+  const leading = auction.current_bidder_id === state.userId;
+  const extension = Number(auction.anti_snipe_extension_seconds ?? 0);
   return `
-    <article class="card auction-card" data-id="${auction.id}" data-price="${price}">
+    <article class="card auction-card${leading ? " auction-card--leading" : ""}" data-id="${auction.id}" data-minimum="${minimum}" data-maximum="${maximum}">
       ${lotVisual(auction)}
       <div class="auction-card__body">
         <div class="auction-line">
@@ -328,200 +300,75 @@ function browseCard(auction) {
           <span class="auction-line__val">${escapeHtml(auction.seller_name ?? "Unknown")}</span>
         </div>
         <div class="auction-line">
-          <span class="auction-line__key">Price</span>
-          <span class="auction-line__val auction-line__val--money">${formatMoney(price)}</span>
+          <span class="auction-line__key">${currentBid == null ? "Starting bid" : "Current bid"}</span>
+          <span class="auction-line__val auction-line__val--money">${formatMoney(currentBid ?? auction.start_price)}</span>
+        </div>
+        <div class="auction-line">
+          <span class="auction-line__key">Reference value (R)</span>
+          <span class="auction-line__val">${formatMoney(referenceValue)}</span>
+        </div>
+        <div class="auction-line">
+          <span class="auction-line__key">Bids</span>
+          <span class="auction-line__val">${formatCount(bidCount)}</span>
         </div>
         <div class="auction-line">
           <span class="auction-line__key">Ends in</span>
           <span class="auction-line__val auction-timer js-countdown" data-ends="${auction.ends_at}">${remainingText(auction.ends_at)}</span>
         </div>
       </div>
+      ${extension > 0 ? `<div class="auction-card__note">Anti-snipe extension: +${Math.round(extension / 60)} min</div>` : ""}
       ${
         mine
-          ? '<div class="auction-card__note">This is your listing.</div>'
-          : `<button class="btn btn--primary btn--block auction-buy" type="button" ${affordable ? "" : "disabled"}>
-               ${affordable ? `Buy now · ${formatMoney(price)}` : "Not enough money"}
-             </button>`
+          ? '<div class="auction-card__note">This is your auction. Sellers cannot bid.</div>'
+          : leading
+          ? '<div class="auction-card__note auction-card__note--good">You are the highest bidder. Another player must bid before you can bid again.</div>'
+          : `<div class="auction-bid">
+               <div class="auction-money-input auction-bid__input"><span class="auction-money-input__prefix">$</span>
+                 <input class="auction-bid-amount" type="number" min="${minimum}" max="${maximum}" step="any" value="${minimum}" inputmode="decimal" aria-label="Bid amount">
+               </div>
+               <button class="btn btn--primary auction-bid__button" type="button" ${affordable ? "" : "disabled"}>Bid</button>
+             </div>
+             <div class="auction-bid__hint">${currentBid == null
+               ? `First bid must equal ${formatMoney(minimum)}.`
+               : `Allowed next bid: ${formatMoney(minimum)}–${formatMoney(maximum)}.`}</div>`
       }
     </article>`;
 }
 
-function wireBuyCard(card) {
+function wireBidCard(card) {
   const id = Number(card.dataset.id);
-  const price = Number(card.dataset.price);
-  const button = card.querySelector(".auction-buy");
-  if (!button) return;
+  const minimum = Number(card.dataset.minimum);
+  const maximum = Number(card.dataset.maximum);
+  const button = card.querySelector(".auction-bid__button");
+  const input = card.querySelector(".auction-bid-amount");
+  if (!button || !input) return;
 
   button.addEventListener("click", async () => {
+    const amount = Number(input.value);
+    if (!Number.isFinite(amount) || amount < minimum || amount > maximum) {
+      notify.error("Bid outside allowed range", `Enter ${formatMoney(minimum)} to ${formatMoney(maximum)}.`);
+      return;
+    }
     const choice = await confirmDialog({
-      title: "Buy this listing?",
-      body: `<p>This buys the lot outright for <strong>${escapeHtml(formatMoney(price))}</strong>.</p>`,
-      confirmLabel: `Buy for ${formatMoney(price)}`
+      title: "Place this bid?",
+      body: `<p><strong>${escapeHtml(formatMoney(amount))}</strong> will be held in escrow. If another player outbids you, the full amount is refunded.</p><p style="margin-top:10px">You cannot bid on this auction again for 1 hour, and another player must bid first.</p>`,
+      confirmLabel: `Bid ${formatMoney(amount)}`
     });
     if (choice !== "confirm") return;
 
     button.disabled = true;
-    const { data, error } = await buyAuction(id);
+    const { data, error } = await placeBid(id, amount);
     if (error) {
-      notify.error("Could not buy", error.message);
+      notify.error("Could not bid", error.message);
       button.disabled = false;
       if (["auction_closed", "auction_not_found"].includes(error.code)) refresh();
       return;
     }
     if (data?.money != null) { state.money = Number(data.money); shell?.setWallet(state.money); }
-    notify.success("Purchased", `You bought the lot for ${formatMoney(price)}.`);
+    notify.success("Bid placed", `${formatMoney(amount)} is now held in escrow.`);
     await refresh();
   });
 }
-
-
-// =========================================================
-// ORDERS (buy order book)
-// =========================================================
-
-function matchingGemsFor(gemName) {
-  return state.gems
-    .filter((g) => !g.locked && g.gem_name === gemName)
-    .sort((a, b) => Number(a.value) - Number(b.value));
-}
-
-function populateOrderGemSelect() {
-  if (orderGem.dataset.filled) return;
-  const names = [...new Set(state.catalogNames ?? [])].sort((a, b) => a.localeCompare(b));
-  orderGem.innerHTML = names.map((n) => `<option value="${escapeHtml(n)}">${escapeHtml(n)}</option>`).join("");
-  orderGem.dataset.filled = "1";
-}
-
-function renderOrders() {
-  if (state.loading) return;
-  populateOrderGemSelect();
-  renderFeePreviews();
-  renderWatchlist();
-
-  const open = state.orders.filter((o) => o.status === "open");
-  if (open.length === 0) {
-    ordersList.innerHTML = `
-      <div class="empty" style="grid-column:1/-1">${icons.gavel}
-        <p class="empty__title">No open orders</p>
-        <p>Post one above — name a gem and what you’ll pay for it.</p>
-      </div>`;
-    return;
-  }
-
-  ordersList.innerHTML = open.map(orderCard).join("");
-  for (const card of ordersList.querySelectorAll(".order-card")) wireOrderCard(card);
-}
-
-watchGemButton?.addEventListener("click",()=>{const name=orderGem.value;if(!name)return;const list=watches();if(!list.includes(name))saveWatches([...list,name]);renderWatchlist();notify.success("Added to watchlist",`${name} will show its current order-book prices here.`);});
-
-function orderCard(order) {
-  const mine = order.buyer_id === state.userId;
-  const matches = matchingGemsFor(order.gem_name);
-  const canFill = !mine && matches.length > 0;
-  const cheapest = matches[0];
-
-  return `
-    <article class="card auction-card order-card" data-id="${order.id}" data-gemname="${escapeHtml(order.gem_name)}">
-      <div class="auction-gem">
-        <div class="auction-gem__name">${gemNameHtml(order.gem_name, escapeHtml)}</div>
-        <div class="auction-gem__meta"><span class="badge badge--accent">Wanted</span></div>
-      </div>
-      <div class="auction-card__body">
-        <div class="auction-line">
-          <span class="auction-line__key">Buyer</span>
-          <span class="auction-line__val">${escapeHtml(order.buyer_name ?? "Unknown")}</span>
-        </div>
-        <div class="auction-line">
-          <span class="auction-line__key">Pays</span>
-          <span class="auction-line__val auction-line__val--money">${formatMoney(order.price)}</span>
-        </div>
-        <div class="auction-line">
-          <span class="auction-line__key">Expires</span>
-          <span class="auction-line__val js-countdown" data-ends="${new Date(new Date(order.created_at).getTime() + 3 * 86400000).toISOString()}">${remainingText(new Date(new Date(order.created_at).getTime() + 3 * 86400000).toISOString())}</span>
-        </div>
-      </div>
-      ${
-        mine
-          ? '<div class="auction-card__note">This is your order.</div>'
-          : canFill
-          ? `<button class="btn btn--primary btn--block order-fill" type="button" data-gem="${cheapest.id}">
-               Sell your ${escapeHtml(order.gem_name)} · ${formatMoney(order.price)}
-             </button>
-             <div class="auction-bid__hint">Gives your ${escapeHtml(formatWeight(cheapest.final_weight))} one (worth ${escapeHtml(formatMoney(cheapest.value))})</div>`
-          : `<div class="auction-card__note">You have no unlocked ${escapeHtml(order.gem_name)}.</div>`
-      }
-    </article>`;
-}
-
-function wireOrderCard(card) {
-  const orderId = Number(card.dataset.id);
-  const gemName = card.dataset.gemname;
-  const button = card.querySelector(".order-fill");
-  if (!button) return;
-
-  button.addEventListener("click", async () => {
-    const gemId = Number(button.dataset.gem);
-    const gem = state.gems.find((g) => g.id === gemId);
-    const order = state.orders.find((o) => o.id === orderId);
-    if (!gem || !order) return;
-
-    const choice = await confirmDialog({
-      title: `Sell your ${gemName}?`,
-      body: `<p>Give your <strong>${escapeHtml(gemName)}</strong>
-        (${escapeHtml(formatWeight(gem.final_weight))}, worth ${escapeHtml(formatMoney(gem.value))})
-        for <strong>${escapeHtml(formatMoney(order.price))}</strong>.</p>`,
-      confirmLabel: `Sell for ${formatMoney(order.price)}`
-    });
-    if (choice !== "confirm") return;
-
-    button.disabled = true;
-    const { data, error } = await fulfillGemOrder(orderId, gemId);
-    if (error) {
-      notify.error("Could not fill order", error.message);
-      button.disabled = false;
-      refresh();
-      return;
-    }
-    if (data?.money != null) { state.money = Number(data.money); shell?.setWallet(state.money); }
-    notify.success("Order filled", `You sold a ${gemName} for ${formatMoney(order.price)}.`);
-    await refresh();
-  });
-}
-
-orderButton.addEventListener("click", async () => {
-  const gemName = orderGem.value;
-  const price = Math.floor(Number(orderPrice.value));
-  if (!gemName) { notify.error("Pick a gem", "Choose which gem to order."); return; }
-  if (!Number.isFinite(price) || price < 1) { notify.error("Invalid price", "Enter at least $1."); return; }
-  const range = selectedOrderPriceRange();
-  if (!range || price < range.minimum || price > range.maximum) {
-    notify.error("Price outside allowed range", range
-      ? `Enter ${formatMoney(range.minimum)} to ${formatMoney(range.maximum)} for this gem.`
-      : "Choose a gem with current catalog pricing.");
-    return;
-  }
-  const feeRate = orderFeeRate(price);
-  const fee = feeAmount(price, feeRate);
-  const total = price + fee;
-  if (total > state.money) { notify.error("Not enough money", `The offer and fee cost ${formatMoney(total)}. You have ${formatMoney(state.money)}.`); return; }
-
-  const choice = await confirmDialog({
-    title: `Order a ${gemName}?`,
-    body: `<p><strong>Offer:</strong> ${escapeHtml(formatMoney(price))}</p>
-      <p><strong>Order fee:</strong> ${escapeHtml(formatMoney(fee))} (${escapeHtml(formatRate(feeRate))})</p>
-      <p><strong>Charged now:</strong> ${escapeHtml(formatMoney(total))}</p>
-      <p style="margin-top:10px">Cancelling or expiring refunds the ${escapeHtml(formatMoney(price))} offer. The order fee is not refunded.</p>`,
-    confirmLabel: "Post order"
-  });
-  if (choice !== "confirm") return;
-
-  orderButton.disabled = true;
-  const { error } = await createGemOrder(gemName, price);
-  orderButton.disabled = false;
-  if (error) { notify.error("Could not post order", error.message); return; }
-  notify.success("Order posted", `Offering ${formatMoney(price)} for a ${gemName}.`);
-  await refresh();
-});
 
 
 // =========================================================
@@ -585,7 +432,7 @@ function renderGemChecklist() {
 function renderPotionChecklist() {
   const potions = ownedPotions();
   if (potions.length === 0) {
-    sellPotionList.innerHTML = `<p class="lot-picker__empty">No potions to sell.</p>`;
+    sellPotionList.innerHTML = `<p class="lot-picker__empty">No tradeable consumables available.</p>`;
     return;
   }
   sellPotionList.innerHTML = potions.map(({ row, def }) => {
@@ -621,8 +468,6 @@ function renderLotSummary() {
 }
 
 sellGemSearch.addEventListener("input", renderGemChecklist);
-orderPrice.addEventListener("input", renderFeePreviews);
-orderGem.addEventListener("change", renderFeePreviews);
 sellPrice.addEventListener("input", renderFeePreviews);
 sellDuration.addEventListener("change", renderFeePreviews);
 sellGemList.addEventListener("change", (event) => {
@@ -652,9 +497,9 @@ lotSummaryList.addEventListener("click", (event) => {
 listButton.addEventListener("click", async () => {
   const count = lotItemCount();
   if (count === 0) return;
-  const price = Math.floor(Number(sellPrice.value));
+  const price = Number(sellPrice.value);
   const hours = Number(sellDuration.value);
-  if (!Number.isFinite(price) || price < 1) { notify.error("Invalid price", "Enter at least $1."); return; }
+  if (!Number.isFinite(price) || price <= 0) { notify.error("Invalid starting bid", "Enter a positive starting bid."); return; }
   const listingRange = selectedLotPriceRange();
   if (!listingRange) {
     notify.error("Cannot price this lot", "One of these consumables does not have a market reference value yet.");
@@ -662,14 +507,16 @@ listButton.addEventListener("click", async () => {
   }
   if (price < listingRange.minimum || price > listingRange.maximum) {
     notify.error(
-      "Price outside allowed range",
-      `List this lot between ${formatMoney(listingRange.minimum)} and ${formatMoney(listingRange.maximum)}.`
+      "Starting bid outside allowed range",
+      `Start this auction between ${formatMoney(listingRange.minimum)} and ${formatMoney(listingRange.maximum)}.`
     );
     return;
   }
-  const feeRate = saleFeeRate(price, hours);
-  const fee = feeAmount(price, feeRate);
-  const proceeds = price - fee;
+  const feeRate = listingFeeRate(hours);
+  if (feeRate == null) { notify.error("Invalid duration", "Choose a supported auction duration."); return; }
+  const fee = feeAmount(listingRange.referenceValue, feeRate);
+  const sellerTax = marginalSellerTax(price, listingRange.referenceValue);
+  if (fee > state.money) { notify.error("Not enough money", `The non-refundable listing fee is ${formatMoney(fee)}. You have ${formatMoney(state.money)}.`); return; }
 
   const items = [
     ...[...state.lot.gems].map((id) => ({ type: "gem", id })),
@@ -681,15 +528,16 @@ listButton.addEventListener("click", async () => {
   ];
 
   const choice = await confirmDialog({
-    title: count === 1 ? "List this item for sale?" : `List a bundle of ${count} items?`,
+    title: count === 1 ? "Auction this item?" : `Auction a bundle of ${count} items?`,
     body: `
-      <p>Buy-now price <strong>${escapeHtml(formatMoney(price))}</strong>, listed for
-      <strong>${hours} hour${hours === 1 ? "" : "s"}</strong>.</p>
-      <p style="margin-top:10px"><strong>Fee if sold:</strong> ${escapeHtml(formatMoney(fee))} (${escapeHtml(formatRate(feeRate))})<br>
-      <strong>You receive:</strong> ${escapeHtml(formatMoney(proceeds))}</p>
+      <p>Starting bid <strong>${escapeHtml(formatMoney(price))}</strong>, open for
+      <strong>${hours} hours</strong>.</p>
+      <p style="margin-top:10px"><strong>Reference value:</strong> ${escapeHtml(formatMoney(listingRange.referenceValue))}<br>
+      <strong>Listing fee charged now:</strong> ${escapeHtml(formatMoney(fee))} (${escapeHtml(formatRate(feeRate))}, non-refundable)<br>
+      <strong>Estimated seller tax at starting bid:</strong> ${escapeHtml(formatMoney(sellerTax))}</p>
       <p style="margin-top:10px"><strong>Lot:</strong> ${escapeHtml(summary.join(", "))}</p>
-      <p style="margin-top:10px">It leaves your inventory while listed and returns if nobody buys it.</p>`,
-    confirmLabel: "List it"
+      <p style="margin-top:10px">The lot leaves your inventory while active. Once a valid bid is placed, the auction cannot be cancelled.</p>`,
+    confirmLabel: "Create auction"
   });
   if (choice !== "confirm") return;
 
@@ -698,60 +546,38 @@ listButton.addEventListener("click", async () => {
   if (error) { notify.error("Could not list", error.message); listButton.disabled = false; return; }
 
   state.lot = { gems: new Set(), potions: new Map() };
-  notify.success("Listed", count === 1 ? "Your item is up for sale." : `Your bundle of ${count} items is up for sale.`);
+  notify.success("Auction created", count === 1 ? "Your item is open for bids." : `Your bundle of ${count} items is open for bids.`);
   await refresh();
   selectTab("mine");
 });
 
 
 // =========================================================
-// MINE (my listings + my orders)
+// MY AUCTIONS
 // =========================================================
 
 const STATUS_LABELS = {
   active: "Active", sold: "Sold", returned: "Unsold — returned", cancelled: "Cancelled"
 };
-const ORDER_STATUS_LABELS = { open: "Open", filled: "Filled", cancelled: "Cancelled", expired: "Expired — refunded" };
 
 function renderMine() {
   if (state.loading) return;
 
   mineList.innerHTML = state.mine.length
     ? state.mine.map(mineCard).join("")
-    : `<div class="empty" style="grid-column:1/-1">${icons.gavel}<p class="empty__title">No listings</p><p>List something from the “Sell” tab.</p></div>`;
+    : `<div class="empty" style="grid-column:1/-1">${icons.gavel}<p class="empty__title">No auctions</p><p>Create one from the “Sell” tab.</p></div>`;
   for (const card of mineList.querySelectorAll(".auction-card")) {
     const id = Number(card.dataset.id);
     card.querySelector('[data-action="cancel"]')?.addEventListener("click", async () => {
       const choice = await confirmDialog({
-        title: "Cancel this listing?",
-        body: `<p>The lot returns to your inventory.</p>`,
-        confirmLabel: "Cancel listing", cancelLabel: "Keep it", tone: "danger"
+        title: "Cancel this auction?",
+        body: `<p>The lot returns to your inventory. The listing fee is not refunded.</p>`,
+        confirmLabel: "Cancel auction", cancelLabel: "Keep it", tone: "danger"
       });
       if (choice !== "confirm") return;
       const { error } = await cancelAuction(id);
       if (error) { notify.error("Could not cancel", error.message); return; }
-      notify.success("Listing cancelled", "The lot is back in your inventory.");
-      await refresh();
-    });
-  }
-
-  const openOrFilled = state.myOrders;
-  myOrdersList.innerHTML = openOrFilled.length
-    ? openOrFilled.map(myOrderCard).join("")
-    : `<div class="empty" style="grid-column:1/-1"><p class="empty__title">No orders</p><p>Post a buy order from the “Orders” tab.</p></div>`;
-  for (const card of myOrdersList.querySelectorAll(".auction-card")) {
-    const id = Number(card.dataset.id);
-    card.querySelector('[data-action="cancel-order"]')?.addEventListener("click", async () => {
-      const choice = await confirmDialog({
-        title: "Cancel this order?",
-        body: `<p>Your held money is refunded.</p>`,
-        confirmLabel: "Cancel order", cancelLabel: "Keep it", tone: "danger"
-      });
-      if (choice !== "confirm") return;
-      const { data, error } = await cancelGemOrder(id);
-      if (error) { notify.error("Could not cancel", error.message); return; }
-      if (data?.money != null) { state.money = Number(data.money); shell?.setWallet(state.money); }
-      notify.success("Order cancelled", "Your money was refunded.");
+      notify.success("Auction cancelled", "The lot is back in your inventory. The listing fee was not refunded.");
       await refresh();
     });
   }
@@ -759,6 +585,11 @@ function renderMine() {
 
 function mineCard(auction) {
   const active = auction.status === "active";
+  const hasBids = Number(auction.bid_count ?? 0) > 0;
+  const displayPrice = auction.current_bid ?? auction.start_price;
+  const sellerTax = auction.status === "sold"
+    ? Number(auction.fee_amount ?? 0)
+    : marginalSellerTax(Number(displayPrice), Number(auction.lot_reference_value));
   return `
     <article class="card auction-card auction-card--mine" data-id="${auction.id}">
       ${lotVisual(auction)}
@@ -768,36 +599,17 @@ function mineCard(auction) {
           <span class="auction-line__val auction-status auction-status--${auction.status}">${STATUS_LABELS[auction.status] ?? auction.status}</span>
         </div>
         <div class="auction-line">
-          <span class="auction-line__key">${auction.status === "sold" ? "Sold for" : "Price"}</span>
-          <span class="auction-line__val auction-line__val--money">${formatMoney(auction.start_price)}</span>
+          <span class="auction-line__key">${auction.status === "sold" ? "Sold for" : hasBids ? "Current bid" : "Starting bid"}</span>
+          <span class="auction-line__val auction-line__val--money">${formatMoney(displayPrice)}</span>
         </div>
+        <div class="auction-line"><span class="auction-line__key">Reference value (R)</span><span class="auction-line__val">${formatMoney(auction.lot_reference_value)}</span></div>
+        <div class="auction-line"><span class="auction-line__key">${auction.status === "sold" ? "Seller tax" : "Estimated tax"}</span><span class="auction-line__val">${formatMoney(sellerTax)}</span></div>
+        <div class="auction-line"><span class="auction-line__key">Listing fee paid</span><span class="auction-line__val">${formatMoney(auction.listing_fee_amount)}</span></div>
         ${auction.status === "sold" && auction.current_bidder_name ? `<div class="auction-line"><span class="auction-line__key">Buyer</span><span class="auction-line__val">${escapeHtml(auction.current_bidder_name)}</span></div>` : ""}
         ${active ? `<div class="auction-line"><span class="auction-line__key">Ends in</span><span class="auction-line__val auction-timer js-countdown" data-ends="${auction.ends_at}">${remainingText(auction.ends_at)}</span></div>` : ""}
       </div>
-      ${active ? '<button class="btn btn--danger btn--sm btn--block" data-action="cancel" type="button">Cancel listing</button>' : ""}
-    </article>`;
-}
-
-function myOrderCard(order) {
-  const open = order.status === "open";
-  return `
-    <article class="card auction-card auction-card--mine" data-id="${order.id}">
-      <div class="auction-gem">
-        <div class="auction-gem__name">${gemNameHtml(order.gem_name, escapeHtml)}</div>
-        <div class="auction-gem__meta"><span class="badge badge--accent">Order</span></div>
-      </div>
-      <div class="auction-card__body">
-        <div class="auction-line">
-          <span class="auction-line__key">Status</span>
-          <span class="auction-line__val auction-status auction-status--${order.status === "filled" ? "sold" : order.status === "open" ? "active" : "cancelled"}">${ORDER_STATUS_LABELS[order.status] ?? order.status}</span>
-        </div>
-        <div class="auction-line">
-          <span class="auction-line__key">${order.status === "filled" ? "Paid" : "Offering"}</span>
-          <span class="auction-line__val auction-line__val--money">${formatMoney(order.price)}</span>
-        </div>
-        ${order.status === "filled" && order.filled_by_name ? `<div class="auction-line"><span class="auction-line__key">Filled by</span><span class="auction-line__val">${escapeHtml(order.filled_by_name)}</span></div>` : ""}
-      </div>
-      ${open ? '<button class="btn btn--danger btn--sm btn--block" data-action="cancel-order" type="button">Cancel order</button>' : ""}
+      ${active && !hasBids ? '<button class="btn btn--danger btn--sm btn--block" data-action="cancel" type="button">Cancel auction</button>' : ""}
+      ${active && hasBids ? '<div class="auction-card__note">Bidding has started, so this auction cannot be cancelled.</div>' : ""}
     </article>`;
 }
 
@@ -819,40 +631,30 @@ function pruneLot() {
 }
 
 async function refresh() {
-  const [auctions, mine, orders, myOrders, gems_, playerState, consumables, catalog] = await Promise.all([
-    loadActiveAuctions(), loadMyAuctions(), loadOpenOrders(), loadMyOrders(),
-    loadCloudGems(), loadCloudPlayerState(), loadCloudConsumables(),
-    loadGemCatalog().catch(() => [])
+  const [auctions, mine, gems_, playerState, consumables] = await Promise.all([
+    loadActiveAuctions(), loadMyAuctions(),
+    loadCloudGems(), loadCloudPlayerState(), loadCloudConsumables()
   ]);
 
   state.loading = false;
-  // Live gem catalog drives the buy-order picker (so custom gems are orderable).
-  state.catalogNames = (catalog ?? []).map((g) => g.name);
   state.auctions = auctions;
   state.mine = mine;
-  state.orders = orders;
-  state.myOrders = myOrders;
   state.gems = Array.isArray(gems_) ? gems_ : [];
   state.consumables = Array.isArray(consumables) ? consumables : [];
-  state.catalog = Array.isArray(catalog) ? catalog : [];
   pruneLot();
 
   if (playerState) { state.money = Number(playerState.money); shell?.setWallet(state.money); }
 
-  statusEl.textContent =
-    `${formatCount(state.auctions.length)} listing${state.auctions.length === 1 ? "" : "s"} · ` +
-    `${formatCount(state.orders.filter((o) => o.status === "open").length)} open order${state.orders.filter((o) => o.status === "open").length === 1 ? "" : "s"}`;
+  statusEl.textContent = `${formatCount(state.auctions.length)} live auction${state.auctions.length === 1 ? "" : "s"}`;
 
   renderBrowse();
-  renderWatchlist();
-  if (state.tab === "orders") renderOrders();
-  else if (state.tab === "sell") renderSell();
+  if (state.tab === "sell") renderSell();
   else if (state.tab === "mine") renderMine();
 }
 
 refreshButton.addEventListener("click", async () => {
   refreshButton.disabled = true;
-  await Promise.all([settleDueAuctions(), settleDueMarketOrders()]);
+  await settleDueAuctions();
   await refresh();
   refreshButton.disabled = false;
 });
@@ -870,7 +672,7 @@ async function boot() {
     return;
   }
   state.userId = user.id;
-  await Promise.all([settleDueAuctions(), settleDueMarketOrders()]);
+  await settleDueAuctions();
   await refresh();
 }
 

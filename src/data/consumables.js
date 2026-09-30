@@ -36,6 +36,8 @@ export const MARKET_REFERENCE_PRICES = Object.freeze({
   "enchanted-pet-toy": 2000000,
   "celestial-pet-charm": 7500000,
   "mythic-pet-whistle": 20000000,
+  "money-up-potion": 25000,
+  "money-up-potion-2": 100000,
   "plastic-bag": 0.10
 });
 
