@@ -4,7 +4,7 @@ import test from "node:test";
 
 const read = (path) => fs.readFileSync(new URL(`../${path}`, import.meta.url), "utf8");
 const sql = read("supabase/migrations/20260927081530_daily_lottery_v1.sql");
-const resultDetailsSql = read("supabase/migrations/20260928143421_expose_lottery_result_details.sql");
+const prizePoolSql = read("supabase/migrations/20260930135909_expose_lottery_prize_pool.sql");
 const randomizedRangesSql = read("supabase/migrations/20260928145656_randomized_lottery_ranges.sql");
 const client = read("src/backend/cloudLottery.js");
 const page = read("lottery/lottery.js");
@@ -156,23 +156,32 @@ test("settlement is retry-safe, concurrency-safe, credits offline winner, and re
   assert.doesNotMatch(settle, /record_fee|burn_player_money|insert into public\.economy_cash_ledger/);
 });
 
-test("public APIs keep the live draw private and expose requested completed-result details", () => {
-  const dashboard = functionBody("get_daily_lottery", resultDetailsSql);
-  for (const key of ["ticketPrice","ownTickets","activityBand","serverNow","recentResults","walletBalance","bankBalance"]) {
+test("public APIs expose the live payable pool and finalized result economics without current tax", () => {
+  const dashboard = functionBody("get_daily_lottery", prizePoolSql);
+  for (const key of ["drawId","ticketPrice","prizePool","ownTickets","serverNow","recentResults","walletBalance","bankBalance"]) {
     assert.match(dashboard,new RegExp(`'${key}'`));
   }
-  for (const key of ["totalTickets","winningTicketNumber","winnerCost","profit","profitPercent"]) {
+  for (const key of ["totalTickets","winningTicketNumber","winnerCost","taxPercent","profit","profitPercent"]) {
     assert.match(dashboard,new RegExp(`'${key}'`));
   }
-  for (const leaked of ["grossRevenue","payoutBasisPoints","winnerTicketCount","effectiveBurn","uniqueParticipants"]) {
+  for (const leaked of ["activityBand","grossRevenue","payoutBasisPoints","winnerTicketCount","effectiveBurn","uniqueParticipants"]) {
     assert.doesNotMatch(dashboard,new RegExp(`'${leaked}'`));
   }
   assert.match(dashboard,/where status='settled' order by draw_date desc limit 10/);
   assert.match(dashboard,/winner_ticket_count::numeric\*d\.ticket_price/);
   assert.doesNotMatch(page,/odds|1 in|jackpot/i);
-  for (const label of ["Expand more","Number of tickets","Winning ticket number","Winner cost","Profit"]) {
+  for (const label of ["Expand more","Number of tickets","Winning ticket number","Winner cost","Prize money","Tax","Profit"]) {
     assert.match(page,new RegExp(label));
   }
+  assert.match(html,/Today's prize pool/);
+  assert.match(html,/Tickets cost <strong>\$10,000<\/strong> each/);
+  assert.doesNotMatch(html,/pool and odds stay private/i);
+  assert.match(page,/POOL_POLL_MS = 5_000/);
+  assert.match(page,/requestAnimationFrame\(animatePrizePool\)/);
+  assert.match(page,/poolDrawId !== drawId \|\| document\.hidden \|\| prefersReducedMotion\(\)/);
+  assert.match(page,/await refresh\(\{ quiet: true \}\)/);
+  assert.doesNotMatch(page,/data\.prizePool\s*=\s*addExactMoney/);
+  assert.doesNotMatch(page,/title = data\.activityBand/);
   assert.match(html,/\+1[\s\S]*\+10[\s\S]*\+100[\s\S]*\+1,000[\s\S]*Custom/);
   assert.doesNotMatch(html,/>MAX</i);
 });

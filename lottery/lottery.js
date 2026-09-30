@@ -8,6 +8,7 @@ mountShell({ page: "lottery", base: "../" });
 
 const TICKET_PRICE = 10_000;
 const MAX_QUANTITY = 900_000_000_000;
+const POOL_POLL_MS = 5_000;
 const $ = (id) => document.getElementById(id);
 const exactTickets = (value) => {
   try { return BigInt(String(value ?? 0)).toLocaleString("en-US"); }
@@ -26,6 +27,53 @@ let data = null;
 let busy = false;
 let serverOffset = 0;
 let boundaryRefresh = null;
+let poolShown = null;
+let poolFrom = null;
+let poolTarget = null;
+let poolTweenStart = 0;
+let poolAnimationFrame = null;
+let poolDrawId = null;
+
+function prefersReducedMotion() {
+  return window.matchMedia?.("(prefers-reduced-motion: reduce)").matches ?? false;
+}
+
+function paintPrizePool() {
+  if (poolShown == null) return;
+  $("prizePool").textContent = formatMoney(poolShown, { exact: true });
+}
+
+function animatePrizePool() {
+  poolAnimationFrame = null;
+  if (poolTarget == null || poolFrom == null) return;
+  const elapsed = performance.now() - poolTweenStart;
+  const progress = Math.min(1, elapsed / POOL_POLL_MS);
+  poolShown = poolFrom + (poolTarget - poolFrom) * progress;
+  paintPrizePool();
+  if (progress < 1) poolAnimationFrame = requestAnimationFrame(animatePrizePool);
+  else poolShown = poolTarget;
+}
+
+function retargetPrizePool(value, drawId) {
+  const next = Number(value);
+  if (!Number.isFinite(next)) return;
+  const shouldSnap = poolShown == null || poolDrawId !== drawId || document.hidden || prefersReducedMotion();
+  poolDrawId = drawId;
+  if (shouldSnap) {
+    if (poolAnimationFrame != null) cancelAnimationFrame(poolAnimationFrame);
+    poolAnimationFrame = null;
+    poolShown = next;
+    poolFrom = next;
+    poolTarget = next;
+    poolTweenStart = performance.now();
+    paintPrizePool();
+    return;
+  }
+  poolFrom = poolShown;
+  poolTarget = next;
+  poolTweenStart = performance.now();
+  if (poolAnimationFrame == null) poolAnimationFrame = requestAnimationFrame(animatePrizePool);
+}
 
 function quantity() {
   const value = Number($("ticketQuantity").value);
@@ -65,7 +113,7 @@ function renderStatus() {
   let detail;
   let target;
   if (data.phase === "open") {
-    title = data.activityBand;
+    title = "Entries are open.";
     detail = "Entries close in";
     target = data.cutoffAt;
   } else if (data.phase === "locked") {
@@ -94,6 +142,8 @@ function renderResults() {
           <div><dt>Number of tickets</dt><dd>${exactTickets(row.totalTickets)}</dd></div>
           <div><dt>Winning ticket number</dt><dd>${row.hadWinner ? exactTickets(row.winningTicketNumber) : "—"}</dd></div>
           <div><dt>Winner cost</dt><dd>${row.hadWinner ? formatMoney(row.winnerCost, { exact: true }) : "—"}</dd></div>
+          <div><dt>Prize money</dt><dd>${formatMoney(row.prize, { exact: true })}</dd></div>
+          <div><dt>Tax</dt><dd>${row.hadWinner ? formatProfitPercent(row.taxPercent) : "—"}</dd></div>
           <div><dt>Profit</dt><dd>${row.hadWinner ? `${formatMoney(row.profit, { exact: true })} (${formatProfitPercent(row.profitPercent)})` : "—"}</dd></div>
         </dl>
       </details>
@@ -102,6 +152,7 @@ function renderResults() {
 }
 
 function render() {
+  retargetPrizePool(data.prizePool,data.drawId);
   renderStatus();
   $("ownTickets").textContent = `Your tickets: ${exactTickets(data.ownTickets)}`;
   $("walletBalance").textContent = formatMoney(data.walletBalance, { exact: true });
@@ -172,10 +223,10 @@ async function buy() {
     } else {
       notify.success("Tickets purchased", `${exactTickets(result.data.ticketsPurchased)} tickets for ${formatMoney(result.data.cost, { exact: true })}.`);
       data.ownTickets = result.data.ownTickets;
-      data.activityBand = result.data.activityBand;
       data.walletBalance = result.data.walletBalance;
       data.bankBalance = result.data.bankBalance;
       render();
+      await refresh({ quiet: true });
     }
   } finally {
     busy = false;
@@ -202,5 +253,5 @@ setInterval(() => {
   const target = data.phase === "open" ? data.cutoffAt : data.phase === "locked" ? data.drawAt : data.nextSalesOpenAt;
   node.textContent = countdown(target);
 }, 1000);
-setInterval(() => refresh({ quiet: true }), 15_000);
+setInterval(() => refresh({ quiet: true }), POOL_POLL_MS);
 refresh();
