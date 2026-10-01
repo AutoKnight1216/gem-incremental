@@ -16,6 +16,10 @@ const allInRework = readFileSync(
   new URL("../supabase/migrations/20260924092958_rework_all_in_pickaxe.sql", import.meta.url),
   "utf8"
 );
+const unlockRebalance = readFileSync(
+  new URL("../supabase/migrations/20261001100225_rebalance_batch_roll_unlocks.sql", import.meta.url),
+  "utf8"
+);
 const one = async (sql, params = []) => (await db.query(sql, params)).rows[0];
 
 await db.exec(`
@@ -43,7 +47,8 @@ await db.exec(`
     roll_speed_bonus double precision not null default 0,
     mutation_chance_bonus double precision not null default 0,
     weight_luck_bonus double precision not null default 0,
-    weight_multiplier_bonus double precision not null default 0
+    weight_multiplier_bonus double precision not null default 0,
+    roll_bulk_bonus integer not null default 0
   );
   create table equipment_ownership_history (player_id uuid not null, equipment_id text not null);
   create table game_mutations (
@@ -94,6 +99,7 @@ await db.exec(`
 await db.exec(migration);
 await db.exec(counterFix);
 await db.exec(allInRework);
+await db.exec(unlockRebalance);
 
 assert.equal(Number((await one("select recipe->>'moneyCost' cost from game_recipes where id='all-in-pickaxe'")).cost), 500_000_000);
 assert.equal((await one("select recipe#>>'{requirements,5,type}' type from game_recipes where id='all-in-pickaxe'")).type, "lifetime-rolls");
@@ -111,7 +117,9 @@ for (const value of [0, 5, 1.5, "2", true, null]) {
 assert.equal((await one("select roll_batch_unlock_status($1,2) result", [uid])).result.status, "unlocked");
 assert.equal((await one("select roll_batch_unlock_status($1,3) result", [uid])).result.status, "batch_locked");
 
-await db.query("update players set total_rolls=100000 where id=$1", [uid]);
+await db.query("update players set total_rolls=49999 where id=$1", [uid]);
+assert.equal((await one("select roll_batch_unlock_status($1,3) result", [uid])).result.status, "batch_locked");
+await db.query("update players set total_rolls=50000 where id=$1", [uid]);
 const state = (await one("select equipment_state from players where id=$1", [uid])).equipment_state;
 const ids = (await db.query("select id from player_equipment where player_id=$1 and equipped order by id", [uid])).rows.map((row) => row.id);
 const triple = (await one("select claim_equipment_roll_batch($1,7500,$2,$3,3) result", [uid, state, ids])).result;
@@ -119,11 +127,20 @@ assert.equal(triple.status, "claimed");
 assert.equal(triple.batchSize, 3);
 assert.equal(Number(triple.genuineRoll), 1);
 
-await db.query("update players set total_rolls=500000,next_roll_at=null,roll_lease_id=null,roll_lease_expires_at=null where id=$1", [uid]);
+await db.query("update players set total_rolls=200000,next_roll_at=null,roll_lease_id=null,roll_lease_expires_at=null where id=$1", [uid]);
 assert.equal((await one("select roll_batch_unlock_status($1,4) result", [uid])).result.status, "batch_locked");
 await db.query("insert into equipment_ownership_history values($1,'celestial-pickaxe')", [uid]);
 assert.equal((await one("select roll_batch_unlock_status($1,4) result", [uid])).result.status, "unlocked");
-assert.equal((await one("select roll_batch_unlock_status($1,5) result", [uid])).result.status, "invalid_batch_size");
+
+await db.query("update players set total_rolls=500000 where id=$1", [uid]);
+assert.equal((await one("select roll_batch_unlock_status($1,5) result", [uid])).result.status, "batch_locked");
+await db.query("insert into equipment_ownership_history values($1,'fortune-pickaxe')", [uid]);
+assert.equal((await one("select roll_batch_unlock_status($1,5) result", [uid])).result.status, "batch_locked");
+await db.query("insert into equipment_ownership_history values($1,'tectonic-pickaxe')", [uid]);
+assert.equal((await one("select roll_batch_unlock_status($1,5) result", [uid])).result.status, "unlocked");
+assert.equal((await one("select roll_batch_unlock_status($1,6) result", [uid])).result.status, "invalid_batch_size");
+await db.query("update player_equipment set roll_bulk_bonus=1 where player_id=$1", [uid]);
+assert.equal((await one("select roll_batch_unlock_status($1,6) result", [uid])).result.status, "unlocked");
 assert.equal(
   (await one("select has_function_privilege('authenticated','public.claim_equipment_roll_batch(uuid,numeric,jsonb,bigint[],integer)','execute') allowed")).allowed,
   false

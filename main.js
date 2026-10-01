@@ -21,6 +21,7 @@ import { isRequirementComplete } from "./src/logic/crafting.js";
 import {
   batchCooldown,
   batchRollResults,
+  countOwnedBatchSpecialistPickaxes,
   isBatchSizeUnlocked,
   renderBatchOptions
 } from "./src/logic/batchRolling.js";
@@ -135,6 +136,7 @@ const view = {
   totalRolls: 0,
   genuineRolls: 0,
   hasCelestialPickaxe: false,
+  specialistPickaxes: 0,
   equippedPickaxe: null,
   impossibleRolls: 0,
   impossibleJoke: null,
@@ -320,6 +322,7 @@ async function refreshPlayerState() {
   view.hasCelestialPickaxe = (equipment ?? []).some(
     (item) => item.equipment_id === "celestial-pickaxe"
   );
+  view.specialistPickaxes = countOwnedBatchSpecialistPickaxes(equipment);
 
   if (!inventoryResult.error) {
     view.inventoryCount = inventoryResult.count ?? 0;
@@ -1193,7 +1196,8 @@ function paintSettings(settings) {
   if (batchSize) {
     const access = {
       totalRolls: view.totalRolls,
-      hasCelestialPickaxe: view.hasCelestialPickaxe
+      hasCelestialPickaxe: view.hasCelestialPickaxe,
+      specialistPickaxes: view.specialistPickaxes
     };
     batchSize.innerHTML = renderBatchOptions(access);
     batchSize.value = String(isBatchSizeUnlocked(settings.batchSize, access) ? settings.batchSize : 1);

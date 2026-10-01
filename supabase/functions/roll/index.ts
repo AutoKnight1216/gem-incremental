@@ -1994,7 +1994,7 @@ async function executeSingleRoll(
         weightLuck *= 2;
         weightMultiplier *= 1.15;
       }
-      const maxBatchFromStats = Math.min(100, 4 + Math.max(0, Math.floor(rollBulk)));
+      const maxBatchFromStats = Math.min(100, 5 + Math.max(0, Math.floor(rollBulk)));
       if (batchExecution.batchSize > maxBatchFromStats) {
         return jsonResponse({ error: "invalid_batch_size", maximumBatchSize: maxBatchFromStats }, { status: 400 });
       }

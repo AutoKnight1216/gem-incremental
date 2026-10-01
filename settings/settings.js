@@ -2,7 +2,11 @@ import { supabase } from "../src/backend/supabase.js";
 import { ensurePlayerAuth } from "../src/backend/auth.js";
 import { loadCloudPlayerState } from "../src/backend/cloudInventory.js";
 import { loadCloudEquipment } from "../src/backend/cloudEquipment.js";
-import { isBatchSizeUnlocked, renderBatchOptions } from "../src/logic/batchRolling.js";
+import {
+  countOwnedBatchSpecialistPickaxes,
+  isBatchSizeUnlocked,
+  renderBatchOptions
+} from "../src/logic/batchRolling.js";
 import {
   describeAccount,
   isGoogleEnabled,
@@ -186,7 +190,7 @@ const globalCashToggle = document.getElementById("globalCashToggle");
 const cashGraphToggle = document.getElementById("cashGraphToggle");
 const gemRealismRange = document.getElementById("gemRealismRange");
 const gemRealismValue = document.getElementById("gemRealismValue");
-let batchAccess = { genuineRolls: 0, hasCelestialPickaxe: false, rollBulk: 0 };
+let batchAccess = { totalRolls: 0, hasCelestialPickaxe: false, specialistPickaxes: 0, rollBulk: 0 };
 
 
 
@@ -292,8 +296,9 @@ Promise.all([
   loadCloudEquipment()
 ]).then(([settings, player, equipment]) => {
   batchAccess = {
-    genuineRolls: Number(player?.equipment_genuine_rolls ?? 0),
+    totalRolls: Number(player?.total_rolls ?? 0),
     hasCelestialPickaxe: (equipment ?? []).some((item) => item.equipment_id === "celestial-pickaxe"),
+    specialistPickaxes: countOwnedBatchSpecialistPickaxes(equipment),
     rollBulk: (equipment ?? []).reduce((sum, item) => sum + Math.max(0, Math.floor(Number(item.roll_bulk_bonus ?? 0) || 0)), 0)
   };
   paintSettings(settings);
