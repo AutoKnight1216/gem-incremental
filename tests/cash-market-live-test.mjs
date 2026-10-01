@@ -21,6 +21,13 @@ assert.match(migration, /pg_try_advisory_xact_lock/);
 assert.match(migration, /system_account_exclusions/);
 assert.match(migration, /grant execute on function public\.get_cash_market_tick\(\) to anon, authenticated/);
 
+const allLifetimeMigration = read("supabase/migrations/20261001153230_global_cash_all_lifetime_earnings.sql");
+assert.match(allLifetimeMigration, /sum\(all_players\.lifetime_earnings\)/);
+assert.match(allLifetimeMigration, /create or replace function public\.get_global_cash\(\)/);
+assert.match(allLifetimeMigration, /create or replace function public\.get_global_cash_feed\(\)/);
+assert.match(allLifetimeMigration, /create or replace function public\.snapshot_global_cash\(\)/);
+assert.match(allLifetimeMigration, /create or replace function public\.get_cash_market_tick\(\)/);
+
 // ── Client: jittered 0.7-1s ticks, fallback, pause when hidden ──
 const graph = read("global-cash-graph/graph.js");
 assert.equal((graph.match(/supabase\.rpc\("get_cash_market_tick"\)/g) ?? []).length, 1);
