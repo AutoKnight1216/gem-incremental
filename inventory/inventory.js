@@ -1069,6 +1069,13 @@ convertRelicsButton?.addEventListener("click", async () => {
 
 function specialistProgress(item) {
  const data=state.equipmentMechanics??{};const id=item.equipment_id;
+ if(id==='celestial-pickaxe'&&data.paradoxTrial?.active){const t=data.paradoxTrial,c=t.checkpoints??{};return `Paradox Final Trial: ${formatCount(t.rolls??0)}/10,000 genuine Celestial rolls · ${Object.values(c).filter(Boolean).length}/5 distinct rarity checkpoints`;}
+ if(id==='paradox-pickaxe'){
+  const p=data.paradox??{},charge=Math.max(0,Number(p.contradiction??0));
+  if(p.mode==='resolved')return `Contradiction: ${formatCount(charge)}/1,000 retained overflow · Paradox Resolved queued (next genuine roll ×3)`;
+  if(p.mode==='critical')return `Contradiction: ${formatCount(charge)}/1,000 retained overflow · Critical Paradox roll ${formatCount(p.criticalRoll??1)}/10 queued (×${(1+Number(p.criticalRoll??1)/10).toFixed(1)})`;
+  return `Contradiction: ${formatCount(charge)}/1,000 · Normal accumulation`;
+ }
  if(id==='reality-shifter')return `${Number(data.rolls?.[id]??0)%500}/500 genuine rolls · Reality Shift in ${500-Number(data.rolls?.[id]??0)%500}`;
  if(id==='bedrock-pickaxe')return `Foundation: ${data.foundation??0}/100 · Empowered rolls remaining: ${data.bedrockBurst??0}`;
  if(id==='tectonic-pickaxe')return `Pressure: ${data.pressure??0}/100 · Crushing Depth: ${data.crushing??0} rolls`;

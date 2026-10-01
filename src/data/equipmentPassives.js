@@ -58,6 +58,7 @@ Object.assign(EQUIPMENT_PASSIVES, {
  'toy-shovel': {name:'Wrong Tool / Close Enough',description:'1/67 genuine rolls borrows a random endgame pickaxe’s stats only. On that proc, another 1/67 uses 67× Luck, 6.7× mutation and Weight Luck, and 2.67× weight.'},
  'silly-fun-happy-pickaxe': {name:'Silly / Happy',description:'Independent effects: 50% Silly ×0.5, 10% Silly ×10, 0.5% Happy ×50. All can stack on the same specimen.'},
  'supersizer-pickaxe': {name:"Gargantuan’s Blessing",description:'Size mutations are mutually exclusive and multiply both weight and value. Gargantuan starts or refreshes a 5-minute blessing after its triggering roll: ×1.5 Final Sell, ×2 Final Luck, ×2.25 final Weight Multiplier, and ×0.75 final Roll Speed. Every 10th genuine blessed roll independently has a 1/20 chance to use ×10,000 Final Luck for that roll.'},
+ 'paradox-pickaxe': {name:'Contradiction / Critical Paradox',description:'Normal genuine rolls build Contradiction from five simultaneous specimen conditions. At 1,000 charge, the next ten genuine Paradox rolls escalate Luck, Mutation Chance, Weight Luck, and Weight Multiplier from ×1.1 to ×2.0. A perfect tenth roll queues one ×3 Paradox Resolved roll. Roll Speed is unchanged and overflow is preserved.'},
  'impossible-pickaxe': {name:'Impossible · Was It Worth It?',description:'Every genuine roll independently has a 1/1,000,000 chance to apply ×1,000,000 Luck, ×100 Mutation Chance, ×100 Weight Luck, and ×10 Weight Multiplier. Every 67th genuine roll replaces the Roll button label with a short joke; this has no gameplay effect.'}
 });
 export function getEquipmentPassive(equipmentId) {
@@ -74,6 +75,7 @@ export const PICKAXE_SPECIALTIES = {
   "the-excavator": "Consumables",
   "bedrock-pickaxe": "Foundation bursts",
   "celestial-pickaxe": "Generalist",
+  "paradox-pickaxe": "Contradiction-powered generalist",
   "supersizer-pickaxe": "Money + oversized specimens",
   "impossible-pickaxe": "Impossible odds + regret"
 };

@@ -160,3 +160,22 @@ export async function craftImpossiblePickaxe(token) {
   if (error) throw error;
   return data;
 }
+
+export async function loadParadoxPickaxeStatus() {
+  const { data, error } = await supabase.rpc("get_paradox_pickaxe_status");
+  if (error?.code === "42883") return null;
+  if (error) throw error;
+  return data;
+}
+
+export async function depositParadoxPickaxeGems(gemIds) {
+  const { data, error } = await supabase.rpc("deposit_paradox_pickaxe_gems", { p_gem_ids: gemIds });
+  if (error) throw error;
+  return data;
+}
+
+export async function startParadoxTrial() {
+  const { data, error } = await supabase.rpc("start_paradox_trial");
+  if (error) throw error;
+  return data;
+}

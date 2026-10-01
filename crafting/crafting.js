@@ -27,7 +27,10 @@ import {
   loadImpossibleDepositCandidates,
   depositImpossiblePickaxeGems,
   prepareImpossiblePickaxeCraft,
-  craftImpossiblePickaxe
+  craftImpossiblePickaxe,
+  loadParadoxPickaxeStatus,
+  depositParadoxPickaxeGems,
+  startParadoxTrial
 } from "../src/backend/cloudCrafting.js";
 import { loadCloudEquipment, loadEquipmentOverhaulProgress } from "../src/backend/cloudEquipment.js";
 import { loadCloudPlayerState } from "../src/backend/cloudInventory.js";
@@ -96,6 +99,7 @@ const state = {
   bestRareNaturalWeight100k: 0,
   bestRareNaturalWeight1m: 0,
   impossibleStatus: null,
+  paradoxStatus: null,
   category: "pickaxe",
   loading: true
 };
@@ -402,6 +406,7 @@ function ratio(value, target) {
 // =========================================================
 
 function isRecipeReady(recipe) {
+  if (recipe.paradoxWorkspace) return false;
   const requirementsMet = recipe.requirements.every((requirement, index) => {
     if (requirement.type === "equipment") {
       return ownsEquipment(requirement.equipmentId);
@@ -605,6 +610,33 @@ function renderCraftingRecommendation() {
   craftingNext.querySelector("[data-open-recipe]")?.addEventListener("click", () => { setCategory(next.craftingTab ?? next.category); requestAnimationFrame(() => document.querySelector(`[data-recipe="${next.id}"]`)?.scrollIntoView({ behavior: "smooth", block: "center" })); });
 }
 
+function paradoxProgressRows(status = state.paradoxStatus) {
+  const m = status?.materials ?? {}, ladder = m.ladder ?? {}, trial = status?.trial ?? {}, checkpoints = trial.checkpoints ?? {};
+  return [
+    ['Legendary specimens',m.legendary,20000],['Mythic specimens',m.mythic,7500],['Exotic specimens',m.exotic,1500],
+    ['Exalted specimens',m.exalted,750],['Cosmic specimens',m.cosmic,100],['Transcendent specimens',m.transcendent,5],
+    ['Combined sacrificed mass',m.totalMass,200000000,'weight'],['Final WM ≥5×',m.wm5,2250],['Final WM ≥10×',m.wm10,75],['Final WM ≥30×',m.wm30,1],
+    ['Effective rarity ≥5B',m.effective5b,25],['Effective rarity ≥25B',m.effective25b,5],['Effective rarity ≥100B',m.effective100b,1],
+    ['Weight <0.01g',m.under001g,3],['Weight >1,000,000g',m.over1mg,3],['Genuine roll with 4 natural mutations',m.natural4,1],
+    ['Unmutated Quartz',m.quartzUnmutated,1000],['Genuine final WM 7×–<8×',m.seven7s,7],['Combined ≥10× WM + ≥25B effective',m.combinedTrophy,1],
+    ['Rarity ladder Common→Transcendent',Object.values(ladder).filter(Boolean).length,10],
+    ['Historical genuine Secret roll',status?.historicalSecret?1:0,1],['Lifetime total_rolls',status?.totalRolls,999999],
+    ['Celestial Pickaxe owned',status?.hasCelestial?1:0,1],['Cash available',status?.money,4000000000,'money'],
+    ['Final Trial genuine Celestial rolls',trial.rolls,10000],['Final Trial Legendary+ checkpoint',checkpoints.legendary?1:0,1],
+    ['Final Trial Mythic+ checkpoint',checkpoints.mythic?1:0,1],['Final Trial Exotic+ checkpoint',checkpoints.exotic?1:0,1],
+    ['Final Trial Exalted+ checkpoint',checkpoints.exalted?1:0,1],['Final Trial Cosmic+ checkpoint',checkpoints.cosmic?1:0,1]
+  ];
+}
+
+function paradoxRequirementsHtml(status = state.paradoxStatus) {
+  if (!status) return '<p class="recipe-card__description">Paradox progress becomes available after its migration is deployed.</p>';
+  return paradoxProgressRows(status).map(([label,have,need,kind]) => {
+    const done=Number(have??0)>=need;
+    const shown=kind==='money'?`${formatMoney(have??0)} / ${formatMoney(need)}`:kind==='weight'?`${formatWeight(have??0)} / ${formatWeight(need)}`:`${formatCount(have??0)} / ${formatCount(need)}`;
+    return `<div class="requirement${done?' requirement--done':''}"><span class="requirement__label">${escapeHtml(label)}</span><span class="requirement__right"><span class="requirement__value">${escapeHtml(shown)}</span><span class="requirement__check${done?'':' requirement__check--missing'}">${done?icons.check:icons.x}</span></span><span class="requirement__bar"><span style="width:${ratio(have,need)*100}%"></span></span></div>`;
+  }).join('');
+}
+
 
 function recipeCard(recipe) {
   const progress = ensureRecipeProgress(state.crafting, recipe);
@@ -630,7 +662,7 @@ function recipeCard(recipe) {
       <div><span>Impossible Profile Background</span><span>Impossible Leaderboard Frame</span><span>Impossible Roll Card</span></div>
     </section>` : '';
 
-  const requirementsHtml = recipe.requirements
+  const requirementsHtml = recipe.paradoxWorkspace ? paradoxRequirementsHtml() : recipe.requirements
     .map((requirement, index) => {
       if (requirement.type === "equipment") {
         const met = ownsEquipment(requirement.equipmentId);
@@ -784,6 +816,8 @@ ${PICKAXE_SPECIALTIES[recipe.id] ? `<p class="equipment-specialty"><strong>Best 
             <div class="requirements">${requirementsHtml}</div>
             ${recipe.manualReviewOnly
               ? '<p class="recipe-card__description impossible-warning">Open the sacrifice workspace to deposit chosen inventory gems or send useful future rolls here with Auto Craft. Every deposited gem counts once and can satisfy every applicable shared-pool requirement.</p>'
+              : recipe.paradoxWorkspace
+              ? '<p class="recipe-card__description">Each deposited specimen is consumed once and counts toward every compatible Paradox requirement. Secret is historical only. The $4B cost is consumed when the Final Trial begins.</p>'
               : recipe.consumeMaterials ? '<p class="recipe-card__description">Materials are consumed. Deposit all uses matching unlocked inventory gems; Auto Craft collects future rolls.</p>' : ""}
 
             <div class="recipe-cost">
@@ -799,6 +833,8 @@ ${PICKAXE_SPECIALTIES[recipe.id] ? `<p class="equipment-specialty"><strong>Best 
             <div class="recipe-card__actions">
               ${recipe.manualReviewOnly ? `
                 <button class="btn btn--primary" data-action="review-impossible" type="button">Review sacrifice plan</button>
+              ` : recipe.paradoxWorkspace ? `
+                <button class="btn btn--primary" data-action="review-paradox" type="button">Open Paradox workspace</button>
               ` : `
               ${recipe.consumeMaterials ? '<button class="btn" data-action="deposit-all" type="button">Deposit all materials</button>' : ""}
               <button class="btn" data-action="auto" type="button">
@@ -1023,6 +1059,38 @@ function openImpossibleReview(result, { openManual = false } = {}) {
   dialog.showModal();
 }
 
+async function renderParadoxCandidates(dialog, offset = 0, search = '') {
+  const host=dialog.querySelector('#paradoxManualCandidates'); if(!host)return;
+  host.innerHTML='<div class="skeleton skeleton--card"></div>';
+  const {data:gems,error,count}=await loadImpossibleDepositCandidates({offset,limit:50,search});
+  if(!dialog.isConnected)return;
+  if(error){host.innerHTML=`<p class="impossible-review__blocked">${escapeHtml(error.message)}</p>`;return;}
+  const rows=gems.map(g=>{const wm=Number(g.base_weight)>0?Number(g.final_weight)/Number(g.base_weight):0;return `<label class="impossible-deposit-gem"><input type="checkbox" data-paradox-gem-id="${escapeHtml(String(g.id))}"><span><strong>${escapeHtml(g.gem_name)}</strong><small>1 in ${formatCount(g.rarity)} · ${formatWeight(g.final_weight)} · ${formatCount(Number(wm.toFixed(2)))}×</small></span><strong>${formatMoney(g.value)}</strong></label>`;}).join('');
+  const end=Math.min(count,offset+gems.length);
+  host.innerHTML=`<form class="paradox-deposit-search"><input class="input" id="paradoxDepositSearch" value="${escapeHtml(search)}" placeholder="Search gem name"><button class="btn btn--sm">Search</button></form><div class="impossible-deposit-toolbar"><label><input type="checkbox" id="paradoxSelectPage"> Select this page</label><span>${count?`${formatCount(offset+1)}–${formatCount(end)} of ${formatCount(count)}`:'No eligible unlocked gems'}</span></div><div class="impossible-deposit-list">${rows||'<p>No matching unlocked gems.</p>'}</div><div class="impossible-deposit-pager"><button class="btn btn--sm" id="paradoxPrev" ${offset<=0?'disabled':''}>Previous</button><button class="btn btn--sm" id="paradoxNext" ${end>=count?'disabled':''}>Next</button></div><div class="impossible-deposit-commit"><label><input type="checkbox" id="paradoxDepositAcknowledge"> I understand selected gems are permanently consumed and count toward every compatible requirement.</label><button class="btn btn--danger" id="paradoxDepositSelected" disabled>Deposit selected gems</button></div>`;
+  const selected=()=>[...host.querySelectorAll('[data-paradox-gem-id]:checked')];
+  const ack=host.querySelector('#paradoxDepositAcknowledge'),button=host.querySelector('#paradoxDepositSelected');
+  const sync=()=>{button.disabled=!ack.checked||!selected().length;};
+  host.querySelectorAll('[data-paradox-gem-id]').forEach(x=>x.addEventListener('change',sync));ack.addEventListener('change',sync);
+  host.querySelector('#paradoxSelectPage')?.addEventListener('change',e=>{host.querySelectorAll('[data-paradox-gem-id]').forEach(x=>{x.checked=e.currentTarget.checked;});sync();});
+  host.querySelector('.paradox-deposit-search')?.addEventListener('submit',e=>{e.preventDefault();renderParadoxCandidates(dialog,0,host.querySelector('#paradoxDepositSearch').value);});
+  host.querySelector('#paradoxPrev')?.addEventListener('click',()=>renderParadoxCandidates(dialog,Math.max(0,offset-50),search));
+  host.querySelector('#paradoxNext')?.addEventListener('click',()=>renderParadoxCandidates(dialog,offset+50,search));
+  button?.addEventListener('click',async()=>{const ids=selected().map(x=>x.dataset.paradoxGemId);button.disabled=true;button.textContent='Depositing atomically…';try{const result=await depositParadoxPickaxeGems(ids);state.paradoxStatus=result;notify.success('Paradox materials deposited',`${formatCount(result.depositedCount??ids.length)} specimens consumed once.`);openParadoxWorkspace(result,{openManual:true});renderRecipes();}catch(err){notify.error('Deposit failed safely',`${err.message}. No partial deposit was kept.`);button.disabled=false;button.textContent='Deposit selected gems';}});
+}
+
+function openParadoxWorkspace(status,{openManual=false}={}) {
+  document.getElementById('paradoxWorkspaceDialog')?.remove();
+  const trial=status?.trial??{}, active=trial.active===true;
+  const dialog=document.createElement('dialog');dialog.id='paradoxWorkspaceDialog';dialog.className='impossible-review';
+  dialog.innerHTML=`<form method="dialog" class="impossible-review__head"><div><span class="eyebrow">PARADOX WORKSPACE</span><h2>Recipe and Final Trial</h2></div><button class="btn" value="cancel">Close</button></form><p>Deposits are permanent and each specimen counts toward every compatible requirement. Secret is historical only and is never consumed.</p><div class="requirements">${paradoxRequirementsHtml(status)}</div>${active?'':`<div class="impossible-workspace-modes"><details class="impossible-workspace-mode" id="paradoxManualMode" ${openManual?'open':''}><summary><span><strong>Manual deposit</strong><small>Choose exact unlocked specimens, up to 50 per page.</small></span><span class="btn btn--sm">Browse inventory</span></summary><div id="paradoxManualCandidates"></div></details><section class="impossible-workspace-mode impossible-auto-mode"><div><strong>Auto Craft</strong><small>Useful future rolls feed this overlap-aware recipe after Gem Filter and bundle routing.</small></div><button class="btn" id="paradoxAutoToggle">${status?.autoCraft?'Stop Auto Craft':'Start Auto Craft'}</button></section></div>`}${active?`<p class="impossible-review__blocked">Final Trial active: equip Celestial and complete ${formatCount(trial.rolls??0)} / 10,000 additional genuine rolls plus all five distinct rarity checkpoints. Deposits are locked for the duration of the trial.</p>`:status?.readyForTrial?'<button class="btn btn--primary" id="paradoxStartTrial">Consume $4B and begin Final Trial</button>':'<p class="impossible-review__blocked">Complete every material, historical, lifetime, Celestial, and cash requirement to begin the Final Trial.</p>'}`;
+  document.body.append(dialog);
+  const manual=dialog.querySelector('#paradoxManualMode');let loaded=false;const load=()=>{if(manual?.open&&!loaded){loaded=true;renderParadoxCandidates(dialog);}};manual?.addEventListener('toggle',load);load();
+  dialog.querySelector('#paradoxAutoToggle')?.addEventListener('click',async e=>{e.currentTarget.disabled=true;const {error,clearedPotion}=await setEquipmentAutoCraft(status?.autoCraft?null:'paradox-pickaxe');if(error){notify.error('Could not change Auto Craft',error.message);e.currentTarget.disabled=false;return;}if(clearedPotion)notify.info('Potion auto-craft stopped','Only one Auto Craft can run at a time.');const fresh=await loadParadoxPickaxeStatus();state.paradoxStatus=fresh;state.crafting.activeAutoCraftRecipeId=fresh.autoCraft?'paradox-pickaxe':null;openParadoxWorkspace(fresh);renderRecipes();});
+  dialog.querySelector('#paradoxStartTrial')?.addEventListener('click',async e=>{e.currentTarget.disabled=true;e.currentTarget.textContent='Starting authoritatively…';try{const fresh=await startParadoxTrial();state.paradoxStatus=fresh;state.money=Number(fresh.money??state.money);notify.success('Final Trial started','Equip Celestial. Deposited materials and the $4B payment are preserved with no deadline.');openParadoxWorkspace(fresh);renderRecipes();}catch(err){notify.error('Could not start Final Trial',err.message);e.currentTarget.disabled=false;}});
+  dialog.addEventListener('close',()=>dialog.remove(),{once:true});dialog.showModal();
+}
+
 // Deposit matching gems into one requirement until it is either
 // complete or nothing more can be added. This keeps working whether
 // the server deposits every matching gem in a single call or one at
@@ -1107,6 +1175,13 @@ function wireRecipeCard(card) {
       button.disabled = false;
       button.textContent = 'Review sacrifice plan';
     }
+  });
+
+  card.querySelector('[data-action="review-paradox"]')?.addEventListener('click', async (event) => {
+    const button=event.currentTarget;button.disabled=true;button.textContent='Opening workspace…';
+    try{const status=await loadParadoxPickaxeStatus();state.paradoxStatus=status;openParadoxWorkspace(status);}
+    catch(error){notify.error('Could not load Paradox progress',error.message);}
+    finally{button.disabled=false;button.textContent='Open Paradox workspace';}
   });
 
   card.querySelector('[data-action="pin"]')?.addEventListener("click", () => togglePinnedRecipe(recipeId));
@@ -1431,19 +1506,21 @@ async function refresh() {
     return;
   }
 
-  const [craftingState, playerState, equipment, consumables, overhaulProgress, adminEquipmentRecipes, impossibleStatus] = await Promise.all([
+  const [craftingState, playerState, equipment, consumables, overhaulProgress, adminEquipmentRecipes, impossibleStatus, paradoxStatus] = await Promise.all([
     loadCloudCraftingState(),
     loadCloudPlayerState(),
     loadCloudEquipment(),
     loadCloudConsumables(),
     loadEquipmentOverhaulProgress(),
     loadAdminEquipmentRecipes(),
-    loadImpossiblePickaxeStatus().catch(() => null)
+    loadImpossiblePickaxeStatus().catch(() => null),
+    loadParadoxPickaxeStatus().catch(() => null)
   ]);
 
   state.loading = false;
   state.specialDiscoveries = overhaulProgress ?? {};
   state.impossibleStatus = impossibleStatus;
+  state.paradoxStatus = paradoxStatus;
   state.specialDiscoveries.batchHistory = {
     ...(state.specialDiscoveries.batchHistory ?? {}),
     ...(impossibleStatus?.requirements ?? {})

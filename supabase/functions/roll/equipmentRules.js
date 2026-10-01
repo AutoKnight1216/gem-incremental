@@ -3,6 +3,7 @@ export const PICKAXE_STATS = {
  'neptune':[30,.7,1.5,1.2,1.2],
  'reality-shifter':[40,.4,0,.8,.8], 'bedrock-pickaxe':[25,3,1,5,1.55],
  'supersizer-pickaxe':[19.91,2.75,.5,5.5,2.4],
+ 'paradox-pickaxe':[34,3.1,1.5,5.5,1.7],
  'impossible-pickaxe':[1,1,1,1,1],
  'fortune-pickaxe':[35,2.8,1,4.25,1.45], 'all-in-pickaxe':[500,.33,.15,.15,.15],
  'all-rounder-toy':[2,2,2,2,2], 'jackpot-slot':[7.77,1.77,.77,1.77,.77], 'money-pickaxe':[.01,.3,2,10,200],
@@ -24,7 +25,7 @@ const TOY_BORROWED_STATS = {
  'bedrock-pickaxe':[25,3.1,1.05,5,1.55]
 };
 export const ASCENDED_VALUE = 2;
-export const SERIOUS_PICKAXES = ['bedrock-pickaxe','celestial-pickaxe','empyrean-pickaxe','eternity-pickaxe','tectonic-pickaxe','the-accelerator','the-resonator','the-excavator','fortune-pickaxe','supersizer-pickaxe','all-in-pickaxe'];
+export const SERIOUS_PICKAXES = ['bedrock-pickaxe','celestial-pickaxe','paradox-pickaxe','empyrean-pickaxe','eternity-pickaxe','tectonic-pickaxe','the-accelerator','the-resonator','the-excavator','fortune-pickaxe','supersizer-pickaxe','all-in-pickaxe'];
 export const SUPERSIZER_SIZE_MUTATIONS = [
  {id:'supersizer-small',name:'Small',chance:1/3,multiplier:.75,weightMultiplier:.75,sizeMutation:true},
  {id:'supersizer-big',name:'Big',chance:1/10,multiplier:1.25,weightMultiplier:1.25,sizeMutation:true},
@@ -40,6 +41,36 @@ export const EXCAVATION_LOOT = [
  [24,28,25,13,7,2,1], [19,26,28,16,8,2,1], [14,24,30,19,9,2,2]
 ];
 export const relicSecondary = (total, active) => 1 + (total - 1) * (active ? 1.5 : 1);
+export const PARADOX_CONTRADICTION_GAINS = [0,1,3,10,40,250];
+export function paradoxConditionCount({rarity=0,naturalWeight=0,naturalMutationCount=0,value=0,effectiveRarity=0}={}) {
+ return [Number(rarity)>=1e6,Number(naturalWeight)>=3,Number(naturalMutationCount)>=1,Number(value)>=25e6,Number(effectiveRarity)>=1e9].filter(Boolean).length;
+}
+function normalizedParadoxState(saved={}) {
+ const paradox=saved.paradox&&typeof saved.paradox==='object'?structuredClone(saved.paradox):{};
+ paradox.contradiction=Math.max(0,Math.trunc(Number(paradox.contradiction??0))||0);
+ paradox.mode=['normal','critical','resolved'].includes(paradox.mode)?paradox.mode:'normal';
+ paradox.criticalRoll=Math.min(10,Math.max(1,Math.trunc(Number(paradox.criticalRoll??1))||1));
+ if(paradox.mode==='normal'&&paradox.contradiction>=1000){paradox.contradiction-=1000;paradox.mode='critical';paradox.criticalRoll=1;}
+ return paradox;
+}
+function finishParadoxSequence(paradox) {
+ if(paradox.contradiction>=1000){paradox.contradiction-=1000;paradox.mode='critical';paradox.criticalRoll=1;}
+ else {paradox.mode='normal';paradox.criticalRoll=1;}
+}
+export function paradoxPassiveMultiplier(state={}) {
+ const paradox=normalizedParadoxState(state);
+ return paradox.mode==='resolved'?3:paradox.mode==='critical'?1+paradox.criticalRoll/10:1;
+}
+export function advanceParadoxTrial(state,rarity) {
+ const trial=state.paradoxTrial;
+ if(!trial?.active||trial.completed)return;
+ trial.rolls=Math.min(10000,Math.max(0,Number(trial.rolls??0))+1);
+ trial.checkpoints={legendary:false,mythic:false,exotic:false,exalted:false,cosmic:false,...trial.checkpoints};
+ const thresholds=[['cosmic',1e7],['exalted',1e6],['exotic',1e5],['mythic',1e4],['legendary',1e3]];
+ const checkpoint=thresholds.find(([key,minimum])=>!trial.checkpoints[key]&&Number(rarity)>=minimum);
+ if(checkpoint)trial.checkpoints[checkpoint[0]]=true;
+ trial.completed=trial.rolls>=10000&&thresholds.every(([key])=>trial.checkpoints[key]);
+}
 export function luckLayers({pickaxe=1,clover=1,enchant=1,guild=1,research=1,focused=1,flat=0,special=1,oneRoll=0,world=1}) {
  const base=pickaxe*clover;
  const personal=1+(enchant-1)+(guild-1)+(research-1)+(focused-1);
@@ -64,6 +95,12 @@ export function prepareEquipmentRoll(id,saved={},random=Math.random,genuine=true
   supersizerBlessedRoll:blessingActive&&(blessedRolls+1)%10===0&&random()<1/20,
   impossible:genuine&&id==='impossible-pickaxe'&&random()<1/1000000};
  if(flags.foundationBurst) {stats[0]*=1.5;stats[3]*=1.25;stats[4]*=1.1;}
+ if(id==='paradox-pickaxe'&&genuine) {
+  const paradox=normalizedParadoxState(state);state.paradox=paradox;
+  const multiplier=paradoxPassiveMultiplier(state);
+  flags.paradox={mode:paradox.mode,criticalRoll:paradox.mode==='critical'?paradox.criticalRoll:null,multiplier,contradiction:paradox.contradiction};
+  stats[0]*=multiplier;stats[2]*=multiplier;stats[3]*=multiplier;stats[4]*=multiplier;
+ }
  if(id==='the-accelerator') stats[1]=acceleratorSpeed(Number(state.spool??0));
  if(id==='toy-shovel'&&random()<1/67) {
   flags.wrongTool=true;
@@ -99,10 +136,29 @@ export function exclusiveMutations(id,random=Math.random,genuine=true,flags={}) 
  if(id!=='silly-fun-happy-pickaxe') return [];
  return [[.5,'silly-small','Silly',.5],[.1,'silly-large','Silly',10],[.005,'happy','Happy',50]].flatMap(([chance,id,name,multiplier])=>random()<chance?[{id,name,chance,multiplier}]:[]);
 }
-export function finishEquipmentRoll(context,{naturalWeight,gem,sizeMutation=null,now=Date.now(),random=Math.random,genuine=true}) {
+export function finishEquipmentRoll(context,{naturalWeight,gem,sizeMutation=null,naturalMutationCount=0,value=0,effectiveRarity=0,now=Date.now(),random=Math.random,genuine=true}) {
  const {id,flags}=context;const state=structuredClone(context.state);
  if(!genuine) return {state,loot:null,breakneck:false};
  state.rolls={...state.rolls,[id]:Number(state.rolls?.[id]??0)+1};
+ if(id==='celestial-pickaxe') advanceParadoxTrial(state,gem?.rarity);
+ if(id==='paradox-pickaxe') {
+  const paradox=normalizedParadoxState(state);
+  const conditions=paradoxConditionCount({rarity:gem?.rarity,naturalWeight,naturalMutationCount,value,effectiveRarity});
+  paradox.lastConditions=conditions;
+  if(context.flags.paradox?.mode==='critical') {
+   const criticalRoll=Number(context.flags.paradox.criticalRoll??1);
+   if(criticalRoll>=10) {
+    if(conditions===5){paradox.mode='resolved';paradox.criticalRoll=1;}
+    else finishParadoxSequence(paradox);
+   } else {paradox.mode='critical';paradox.criticalRoll=criticalRoll+1;}
+  } else if(context.flags.paradox?.mode==='resolved') finishParadoxSequence(paradox);
+  else {
+   paradox.contradiction+=PARADOX_CONTRADICTION_GAINS[conditions]??0;
+   if(paradox.contradiction>=1000){paradox.contradiction-=1000;paradox.mode='critical';paradox.criticalRoll=1;}
+   else paradox.mode='normal';
+  }
+  state.paradox=paradox;
+ }
  if(id==='supersizer-pickaxe') {
   if(flags.supersizerBlessing) state.supersizerBlessedRolls=Math.max(0,Number(state.supersizerBlessedRolls??0))+1;
   else state.supersizerBlessedRolls=0;
