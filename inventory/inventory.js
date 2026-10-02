@@ -36,6 +36,7 @@ import { ENCHANTS, RELICS, enchantDescription, isRelic } from "../src/data/encha
 import { getEquipmentPassive, PICKAXE_SPECIALTIES } from "../src/data/equipmentPassives.js";
 import { MASTERWORK_PASSIVES, MASTERWORK_ATTUNEMENTS, masterworkLevelCost, masterworkRerollCost, masterworkAttunementCost, masterworkPassive } from "../src/data/masterwork.js";
 import { gemRollChance, formatChance, exactChanceDenominator, formatExactDenominator } from "../src/logic/chances.js";
+import { compareInventoryEffectiveRarity } from "../src/logic/inventorySort.js";
 
 import { mountShell } from "../src/ui/shell.js";
 import { signInEmptyStateHtml } from "../src/ui/signInState.js";
@@ -395,6 +396,7 @@ function visibleGems() {
     oldest: (a, b) => new Date(a.created_at) - new Date(b.created_at),
     value: (a, b) => b.value - a.value,
     rarity: (a, b) => b.rarity - a.rarity,
+    effectiveRarity: compareInventoryEffectiveRarity,
     weight: (a, b) => b.final_weight - a.final_weight
   };
 
