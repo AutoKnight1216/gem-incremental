@@ -42,6 +42,7 @@ const RARITY_BAND_ORDER = Object.freeze([
   "exalted", "cosmic", "transcendent", "secret", "limited", "anomalous"
 ]);
 const LIMITED_TIER = Object.freeze({ id: "limited", name: "Limited" });
+const ANOMALOUS_TIER = Object.freeze({ id: "anomalous", name: "Anomalous" });
 
 let mutationList = [];
 let mutationById = new Map();
@@ -112,6 +113,7 @@ function isSecretLocked(entry) {
 }
 
 function baseTier(entry) {
+  if (entry.gem.metadata?.rarityClass === "anomalous") return ANOMALOUS_TIER;
   return rarityTier(entry.gem.rarity, entry.gem.name);
 }
 
@@ -267,12 +269,16 @@ function entriesForView() {
 }
 
 function catalogRarityLabel(gem) {
+  if (Number.isFinite(Number(gem.metadata?.displayRarity))) {
+    return String(Number(gem.metadata.displayRarity));
+  }
   return gem.metadata?.rarityClass === "anomalous"
     ? `Anomalous · ${rarityLabel(gem.metadata.rawChanceDenominator || gem.rarity)} raw`
     : rarityLabel(gem.rarity);
 }
 
 function rawChanceLabel(entry) {
+  if (entry.gem.metadata?.onePerAccount === true) return "Puzzle claim · one per account";
   const denominator = rawCombinationDenominator(entry.gem.rarity, entry.mutationIds, mutationById);
   return denominator ? `1 in ${denominator.toLocaleString("en-US")} raw` : "Condition-dependent";
 }
@@ -354,6 +360,7 @@ function revealedCard(entry, record) {
   return `<article class="index-card tier-${escapeHtml(tier.id)}" data-combination="${escapeHtml(entry.combinationKey)}" style="--gem-bg:${escapeHtml(style.color)};--gem-glow:${escapeHtml(style.glow || "transparent")}">
     <div class="index-card__head"><div class="index-card__gem-icon">${gemIconHtml(entry.gem.name, "gem-icon--index", entry.mutationIds)}</div><div class="index-card__title-block"><div class="index-card__gem-title">${escapeHtml(entry.gem.title)}</div><div class="index-card__name">${gemNameHtml(entry.gem.name, escapeHtml)}</div>${mutationNameHtml(entry.mutationIds)}<div class="index-card__rarity">${escapeHtml(catalogRarityLabel(entry.gem))}</div></div><span class="badge badge--tier">${escapeHtml(tier.name)}</span></div>
     <p class="index-card__desc">${escapeHtml(entry.gem.description || "No description available.")}</p>
+    ${entry.gem.metadata?.puzzleClue ? `<p class="index-card__clue">${escapeHtml(entry.gem.metadata.puzzleClue)}</p>` : ""}
     ${record ? "" : '<p class="index-card__hidden">Gem identified; this exact mutation combination has not been found.</p>'}
     ${availabilityHtml(entry.gem)}
     ${mutationSourceLabel(entry.mutationIds) ? `<p class="index-card__availability">${escapeHtml(mutationSourceLabel(entry.mutationIds))}</p>` : ""}
@@ -506,6 +513,17 @@ function renderList() {
     gemList.innerHTML = `<div class="empty index-error"><p class="empty__title">Gem Index unavailable</p><p>${escapeHtml(state.error)}</p><button class="btn btn--sm" type="button" data-retry-index>Retry</button></div>`;
     return;
   }
+  if (gemSearch.value.trim() === "-1") {
+    const prerequisitesMet = state.discoveredGemNames.has("π") && state.discoveredGemNames.has("e");
+    const alreadyClaimed = state.discoveredGemNames.has("i");
+    gemList.innerHTML = `<section class="index-puzzle" aria-labelledby="imaginaryPuzzleTitle">
+      <p class="index-puzzle__signal">Not in the reals.</p>
+      <h2 id="imaginaryPuzzleTitle">?² = −1</h2>
+      <p>${alreadyClaimed ? "The imaginary unit is already recorded in your index." : prerequisitesMet ? "Two discoveries point beyond the real number line." : "Two familiar constants must be discovered before this path resolves."}</p>
+      ${alreadyClaimed ? "" : `<form data-imaginary-puzzle><label class="field"><span>What belongs in place of ?</span><input name="answer" inputmode="text" autocomplete="off" maxlength="16" ${prerequisitesMet ? "" : "disabled"}></label><button class="btn" type="submit" ${prerequisitesMet ? "" : "disabled"}>Resolve</button></form>`}
+    </section>`;
+    return;
+  }
   const list = visibleEntries();
   if (!list.length) {
     const impossible = selectedMutationIds().length &&
@@ -626,6 +644,35 @@ gemList.addEventListener("click", async (event) => {
       mutationIds: (button.dataset.replayMutations ?? "").split(",").filter(Boolean)
     });
   } finally {
+    button.disabled = false;
+  }
+});
+
+gemList.addEventListener("submit", async (event) => {
+  const form = event.target.closest("[data-imaginary-puzzle]");
+  if (!form) return;
+  event.preventDefault();
+  const button = form.querySelector("button");
+  const answer = String(new FormData(form).get("answer") ?? "").trim();
+  button.disabled = true;
+  try {
+    const { data, error } = await supabase.rpc("claim_anomalous_i", { p_answer: answer });
+    if (error) throw error;
+    if (data?.claimed !== true) throw new Error("The puzzle did not resolve.");
+    notify.success("Anomalous gem claimed", "i was added to your inventory and locked.");
+    await refresh({ force: true, quiet: true });
+  } catch (error) {
+    const code = String(error?.message ?? "");
+    const message = code.includes("incorrect_answer")
+      ? "That does not satisfy the equation."
+      : code.includes("prerequisites_not_met")
+      ? "Discover π and e first."
+      : code.includes("already_claimed")
+      ? "This account has already claimed i."
+      : code.includes("inventory_full")
+      ? "Free one inventory slot before claiming i."
+      : "The puzzle could not be resolved right now.";
+    notify.error("Not resolved", message);
     button.disabled = false;
   }
 });

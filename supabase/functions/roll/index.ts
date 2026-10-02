@@ -3,17 +3,18 @@ import { gemTimeAvailable, mythicPotionExclusiveGem } from "./availabilityRules.
 // QOL_RULES_START
 export function gemFilterDecision(settings, specimen, discovered) {
  const name = specimen.gem_name;
+ const protectedFromAutomaticConsumption = specimen.automatic_consumption_protected === true;
  const raw = Number(specimen.rarity);
  const threshold = (v, fallback) => Number.isFinite(Number(v)) && Number(v) >= 1 ? Number(v) : fallback;
  const rule = settings.gemFilter?.[name];
  const relic = name === 'Enchant Relic' || name === 'Ancient Relic';
  const discovery = !discovered.has(name) && settings.discoveryKeep !== false && raw >= threshold(settings.discoveryKeepRarity, 10000);
  const autoKeep = settings.autoKeep !== false && Number(specimen.effectiveRarity) >= threshold(settings.autoKeepEffectiveRarity, 1000000);
- const keep = relic || discovery || autoKeep || rule === 'KEEP';
+ const keep = protectedFromAutomaticConsumption || relic || discovery || autoKeep || rule === 'KEEP';
  const legacyLimit = {common:10,uncommon:50,rare:100,epic:1000,legendary:10000,mythic:100000};
  const legacy = (settings.legacyAutoSell ?? settings.autoSell) === true && raw <= (legacyLimit[settings.legacyAutoSellTier ?? settings.autoSellTier] ?? 10);
  return { keep, sell: !keep && (rule === 'SELL' || (rule == null && legacy)),
-  reason: relic ? 'relic' : discovery ? 'discovery' : autoKeep ? 'auto-keep' : rule === 'KEEP' ? 'filter-keep' : 'default' };
+  reason: protectedFromAutomaticConsumption ? 'automatic-consumption-protection' : relic ? 'relic' : discovery ? 'discovery' : autoKeep ? 'auto-keep' : rule === 'KEEP' ? 'filter-keep' : 'default' };
 }
 // QOL_RULES_END
 
@@ -3074,7 +3075,10 @@ async function executeSingleRoll(
         genuine_roll:
           true,
 
-        value
+        value,
+
+        automatic_consumption_protected:
+          gem.metadata?.automaticConsumptionProtected === true
       };
       recordRollPhase(batchExecution, batchIndex, "rng_js_ms", rngJsStartedAt);
 
@@ -3118,7 +3122,12 @@ async function executeSingleRoll(
         catch (error: any) { return jsonResponse({ error:error.deepSeaCode ?? "deep_sea_commit_failed" }, { status:409 }); }
       }
       let deepcoreAutoContribution: any = null;
-      if (batchExecution.pool === "normal" && deepcoreContext?.status === "active" && deepcoreContext?.autoContribute === true) {
+      if (
+        batchExecution.pool === "normal" &&
+        gem.metadata?.automaticConsumptionProtected !== true &&
+        deepcoreContext?.status === "active" &&
+        deepcoreContext?.autoContribute === true
+      ) {
         const { data: contribution, error: contributionError } = await ctx.supabaseAdmin.rpc(
           "deepcore_auto_contribute_roll",
           { p_player_id: playerId, p_specimen: specimen }
