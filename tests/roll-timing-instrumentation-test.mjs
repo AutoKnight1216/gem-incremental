@@ -10,9 +10,11 @@ for (const phase of [
   "lease_claim_ms",
   "rng_js_ms",
   "bundle_route_roll_ms",
+  "roll_route_result_ms",
   "roll_autocraft_deposit_ms",
   "inventory_insert_ms",
   "commit_equipment_roll_ms",
+  "roll_commit_result_ms",
   "roll_finish_bookkeeping_critical_ms",
   "roll_finish_bookkeeping_background_ms",
   "roll_finish_bookkeeping_loss_ms"

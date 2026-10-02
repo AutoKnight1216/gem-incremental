@@ -293,7 +293,7 @@ assert.equal(Number((await one("select count(*) count from roll_weight_history w
 assert.equal(Number((await one("select min(final_weight) minimum from roll_weight_history where player_id=$1", [uid])).minimum), 1);
 
 assert.match(edge, /currentInventoryCount \+ batchExecution\.batchSize > effectiveInventoryCapacity/, "x4 preflight reserves every required slot");
-assert.match(edge, /commit_equipment_roll[\s\S]*p_bookkeeping: bookkeepingPayload/);
+assert.match(edge, /roll_commit_result[\s\S]*p_bookkeeping: bookkeepingPayload/);
 assert.doesNotMatch(edge, /supabaseAdmin\.rpc\("claim_guild_mythic_surge"/);
 assert.doesNotMatch(edge, /roll_finish_bookkeeping[\s\S]*p_phase: "critical"/);
 assert.match(edge, /roll_finish_bookkeeping[\s\S]*p_phase: "background"/);

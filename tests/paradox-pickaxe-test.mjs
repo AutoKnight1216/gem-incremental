@@ -58,10 +58,12 @@ assert.match(migration,/paradox_private\.deposit_specimen/);
 assert.match(migration,/natural_mutation_ids/);
 assert.match(migration,/complete_paradox_trial/);
 const edge=readFileSync(new URL('../supabase/functions/roll/index.ts',import.meta.url),'utf8');
+const phase6=readFileSync(new URL('../supabase/migrations/20261002053827_phase6_roll_request_amplification.sql',import.meta.url),'utf8');
 const rules=readFileSync(new URL('../supabase/functions/roll/equipmentRules.js',import.meta.url),'utf8').trim();
 assert.ok(edge.includes(rules),'optimized roll keeps the shared equipment rules synchronized');
 assert.match(edge,/naturalMutationCount: naturalMutations\.length/);
-assert.match(edge,/activeAutoCraft === 'paradox-pickaxe'/);
+assert.match(edge,/roll_route_result/);
+assert.match(phase6,/p_active_auto_craft = 'paradox-pickaxe'[\s\S]*paradox_autocraft_deposit/);
 assert.match(edge,/complete_paradox_trial/);
 
 console.log('Paradox recipe, overlap/provenance migration, Final Trial, overflow, Critical sequence and Resolved rules passed.');

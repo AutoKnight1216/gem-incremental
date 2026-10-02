@@ -10,6 +10,7 @@ const routeRebalanceSql=read("supabase/migrations/20260925103659_rebalance_deepc
 const crystalline500Sql=read("supabase/migrations/20260927100742_nerf_deepcore_crystalline_passage_to_500.sql");
 const deepcoreEdge=read("supabase/functions/deepcore/index.ts");
 const roll=read("supabase/functions/roll/index.ts");
+const phase6Sql=read("supabase/migrations/20261002053827_phase6_roll_request_amplification.sql");
 const page=read("limited-events/deepcore/index.html");
 const client=read("limited-events/deepcore/deepcore.js");
 const cutscenes=read("src/ui/cutsceneConfig.js");
@@ -35,7 +36,7 @@ assert.match(sql,/g\.locked or g\.museum_locked/); assert.match(sql,/p_objective
 assert.match(sql,/for idx in 1\.\.greatest\(0,floor\(\(e\.effective_funding-10000000000\)\/500000000\)/);
 assert.match(sql,/eligible_at is not null and eligible_at<'2026-10-04T00:00:00Z'/);
 for(const id of ["lucky-potion-4","speed-potion-4","fortune-potion-4","mass-potion-4"]) assert.match(sql,new RegExp(id));
-assert.match(roll,/deepcore_get_roll_context/); assert.match(roll,/deepcore_auto_contribute_roll/); assert.match(roll,/deepcorePhaseOrder/);
+assert.match(roll,/roll_prepare_context_v2/); assert.match(phase6Sql,/deepcore_get_roll_context/); assert.match(roll,/deepcore_auto_contribute_roll/); assert.match(roll,/deepcorePhaseOrder/);
 assert.match(page,/Overview/); assert.match(page,/Quests/); assert.match(page,/Supply Shop/); assert.match(page,/Consumables/); assert.match(page,/Leaderboards/); assert.match(page,/Project Log/);
 assert.match(client,/status==="preview"/); assert.match(sql,/Asia\/Singapore/);
 assert.match(client,/legendary_sacrificed/); assert.match(client,/50,000 Legendary specimens/);
