@@ -12,6 +12,12 @@
 .lottery-status h2 { margin: 0 0 8px; font-family: "Orbitron",sans-serif; }
 .lottery-status p { margin: 0; color: var(--muted); }
 .lottery-status [data-countdown] { color: var(--text); font-variant-numeric: tabular-nums; }
+.lottery-restriction { margin-top: 18px; padding-block: clamp(28px,6vw,64px); text-align: center; }
+.lottery-restriction h2 { max-width: 720px; margin: 0 auto 16px; font-family: "Orbitron",sans-serif; font-size: clamp(1.7rem,4vw,3rem); }
+.lottery-restriction > p:not(.lottery-kicker) { max-width: 680px; margin: 0 auto; color: var(--muted); font-size: 1.02rem; line-height: 1.65; }
+.lottery-restriction__countdown { display: grid; gap: 6px; width: max-content; max-width: 100%; margin: 30px auto 0; padding: 18px 24px; border: 1px solid var(--border); border-radius: 14px; background: var(--surface-2); }
+.lottery-restriction__countdown span { color: var(--muted); font-size: .78rem; font-weight: 800; letter-spacing: .08em; text-transform: uppercase; }
+.lottery-restriction__countdown strong { color: var(--accent); font-family: "Orbitron",sans-serif; font-size: clamp(1.25rem,4vw,2rem); font-variant-numeric: tabular-nums; }
 .lottery-ticket-price { display: grid; gap: 4px; min-width: 150px; padding: 16px 20px; border: 1px solid var(--border); border-radius: 14px; background: color-mix(in srgb,var(--surface) 88%,transparent); z-index: 1; }
 .lottery-ticket-price span { color: var(--muted); font-size: .78rem; text-transform: uppercase; letter-spacing: .08em; }
 .lottery-ticket-price strong { font-size: 1.2rem; }
