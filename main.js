@@ -790,6 +790,13 @@ async function performRoll() {
   }
 
   if (error) {
+    if (error.code === "game_maintenance") {
+      if (getSettings().autoRoll) await updateSettings({ autoRoll: false });
+      notify.warning("Update in progress", error.message);
+      view.ready = true;
+      setButton({ mode: "", label: "Update in progress", disabled: true });
+      return;
+    }
     if (error.code === "deep_sea_event_ended" || error.details?.cause?.error === "deep_sea_event_ended") {
       const wasAutoRolling = getSettings().autoRoll;
       await updateSettings({ autoRoll: false, rollPool: "normal" });

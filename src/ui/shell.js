@@ -45,6 +45,7 @@ import { startActivityHeartbeat } from "./activityHeartbeat.js";
 import { getSettings, onSettingsChange } from "./settings.js";
 import { initGlobalCutscenes } from "./globalCutscenes.js";
 import { mountMonthTwoAnniversary } from "./monthTwoAnniversary.js";
+import { mountMaintenanceMode } from "./maintenanceMode.js";
 
 
 // =========================================================
@@ -290,6 +291,7 @@ export function mountShell({ page, base = "./" }) {
   // the player is on any page, so every route mounts the same durable queue.
   initGlobalCutscenes();
   mountMonthTwoAnniversary({ base });
+  mountMaintenanceMode({ page });
   keepSegmentedTabsInView();
 
   const header = document.createElement("header");

@@ -19,6 +19,7 @@ const FRIENDLY_MESSAGES = {
   batch_incomplete: "The server could not finish every roll in this batch.",
   roll_state_changed: "Your equipment changed while the roll was starting. Try again.",
   inventory_full: "Your inventory is full. Sell or craft something first.",
+  game_maintenance: "The game is temporarily offline for an update.",
   gem_locked: "That gem is locked. Unlock it before selling.",
   relic_not_sellable: "Relics cannot be sold; use one to enchant a pickaxe.",
   not_found: "That item no longer exists.",

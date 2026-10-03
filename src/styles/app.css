@@ -6227,3 +6227,54 @@ input[type="radio"] {
 .anniversary-intro-open{overflow:hidden}
 @media(max-width:600px){.anniversary-intro__content{padding:20px}.anniversary-intro__halves i{top:12%;bottom:12%;width:48vw}.anniversary-intro__hint{top:calc(100% + 18px)}}
 @media(prefers-reduced-motion:reduce){.anniversary-intro *{transition-duration:.01ms!important;animation-duration:.01ms!important}}
+/* Scheduled maintenance is mounted by the shared shell on every game page. */
+.maintenance-notice {
+  position: fixed;
+  z-index: 9990;
+  left: 50%;
+  top: calc(var(--topbar-height, 64px) + 12px);
+  width: min(720px, calc(100vw - 24px));
+  transform: translateX(-50%);
+  padding: 12px 16px;
+  border: 1px solid color-mix(in srgb, #f6c453 55%, var(--border));
+  border-radius: var(--radius-md, 12px);
+  background: color-mix(in srgb, var(--surface, #111722) 92%, #f6c453 8%);
+  box-shadow: 0 18px 48px rgb(0 0 0 / 35%);
+  color: var(--text);
+}
+
+.maintenance-notice[hidden],
+.maintenance-overlay[hidden] { display: none; }
+.maintenance-notice strong { display: block; margin-bottom: 3px; color: #ffd979; }
+.maintenance-notice span { color: var(--text-muted); font-size: .9rem; }
+
+.maintenance-active { overflow: hidden; }
+.maintenance-overlay {
+  position: fixed;
+  z-index: 10000;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  padding: 24px;
+  background:
+    radial-gradient(circle at 50% 20%, rgb(91 114 255 / 18%), transparent 42%),
+    color-mix(in srgb, var(--page, #080b11) 96%, transparent);
+  backdrop-filter: blur(14px);
+}
+.maintenance-overlay__card {
+  width: min(560px, 100%);
+  padding: clamp(28px, 6vw, 52px);
+  border: 1px solid var(--border);
+  border-radius: calc(var(--radius-lg, 16px) * 1.25);
+  background: var(--surface, #111722);
+  box-shadow: 0 30px 100px rgb(0 0 0 / 48%);
+  text-align: center;
+}
+.maintenance-overlay__icon { display: inline-grid; place-items: center; width: 54px; height: 54px; border-radius: 16px; background: var(--accent-soft, rgb(99 102 241 / 16%)); color: var(--accent, #818cf8); font-size: 1.5rem; }
+.maintenance-overlay__eyebrow { margin: 18px 0 6px; color: var(--accent, #818cf8); font-size: .75rem; font-weight: 800; letter-spacing: .14em; text-transform: uppercase; }
+.maintenance-overlay h1 { margin: 0; font-size: clamp(1.7rem, 5vw, 2.5rem); }
+.maintenance-overlay__card > p:not(.maintenance-overlay__eyebrow, .maintenance-overlay__hint) { margin: 14px auto 0; max-width: 44ch; color: var(--text-muted); line-height: 1.6; }
+.maintenance-overlay__time { display: grid; gap: 5px; margin-top: 24px; padding: 16px; border-radius: var(--radius-md, 12px); background: var(--surface-sunken, #0b1018); }
+.maintenance-overlay__time span, .maintenance-overlay__time small, .maintenance-overlay__hint { color: var(--text-muted); }
+.maintenance-overlay__time strong { font-size: 1.05rem; }
+.maintenance-overlay__hint { margin: 20px 0 0; font-size: .82rem; }

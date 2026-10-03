@@ -2,6 +2,7 @@
   "private": true,
   "type": "module",
   "scripts": {
+    "test:maintenance": "node tests/game-maintenance-shutdown-test.mjs",
     "test:events": "node tests/global-random-events-test.mjs",
     "test:pending-gems": "node --test tests/pending-gems-test.mjs && node tests/pending-gems-database-test.mjs",
     "test:money-up-potion": "node tests/money-up-potion-database-test.mjs",

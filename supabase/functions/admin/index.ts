@@ -204,6 +204,69 @@ export default {
         return response({ error: "admin_forbidden" }, 403);
       }
 
+      if (action === "maintenance_status") {
+        const { data, error } = await ctx.supabaseAdmin
+          .from("game_maintenance")
+          .select("starts_at,ends_at,message,updated_at")
+          .eq("id", "global")
+          .maybeSingle();
+        if (error) return response({ error: "maintenance_load_failed", message: error.message }, 500);
+        return response({ maintenance: data ?? null, serverNow: new Date().toISOString() });
+      }
+
+      if (action === "maintenance_schedule") {
+        const startsAt = new Date(String(body.startsAt ?? ""));
+        const durationMinutes = Number(body.durationMinutes);
+        const message = String(body.message ?? "The game is shutting down for an update.").trim();
+        const now = Date.now();
+        const startMs = startsAt.getTime();
+
+        if (!Number.isFinite(startMs) || startMs < now - 60_000 || startMs > now + 366 * 24 * 60 * 60 * 1000) {
+          return response({ error: "invalid_maintenance_start", message: "Choose a start time between now and one year from now." }, 400);
+        }
+        if (!Number.isSafeInteger(durationMinutes) || durationMinutes < 1 || durationMinutes > 525_600) {
+          return response({ error: "invalid_maintenance_duration", message: "Shutdown duration must be between 1 minute and 1 year." }, 400);
+        }
+        if (message.length < 1 || message.length > 300) {
+          return response({ error: "invalid_maintenance_message", message: "Shutdown message must be between 1 and 300 characters." }, 400);
+        }
+
+        const normalizedStart = new Date(Math.max(startMs, now));
+        const endsAt = new Date(normalizedStart.getTime() + durationMinutes * 60_000);
+        const values = {
+          starts_at: normalizedStart.toISOString(),
+          ends_at: endsAt.toISOString(),
+          message,
+          updated_by: adminId,
+          updated_at: new Date().toISOString()
+        };
+        const { data, error } = await ctx.supabaseAdmin
+          .from("game_maintenance")
+          .upsert({ id: "global", ...values }, { onConflict: "id" })
+          .select("starts_at,ends_at,message,updated_at")
+          .single();
+        if (error) return response({ error: "maintenance_schedule_failed", message: error.message }, 500);
+        await audit(ctx, adminId, null, "game_shutdown_scheduled", {
+          startsAt: data.starts_at,
+          endsAt: data.ends_at,
+          durationMinutes
+        });
+        return response({ maintenance: data, serverNow: new Date().toISOString() });
+      }
+
+      if (action === "maintenance_end") {
+        const updatedAt = new Date().toISOString();
+        const { data, error } = await ctx.supabaseAdmin
+          .from("game_maintenance")
+          .update({ starts_at: null, ends_at: null, updated_by: adminId, updated_at: updatedAt })
+          .eq("id", "global")
+          .select("starts_at,ends_at,message,updated_at")
+          .single();
+        if (error) return response({ error: "maintenance_end_failed", message: error.message }, 500);
+        await audit(ctx, adminId, null, "game_shutdown_ended_early", {});
+        return response({ maintenance: data, serverNow: updatedAt });
+      }
+
       if (action === "appeals_list") {
         const requestedStatus = String(body.status ?? "pending");
         const statusFilter = ["pending", "accepted", "rejected"].includes(requestedStatus)
