@@ -38,6 +38,12 @@ end;
 $$;
 revoke all on function public._auction_restore_gem(uuid,jsonb) from public,anon,authenticated;
 
+-- This is an administrative provenance backfill, including specimens that are
+-- currently exhibited. Use the museum's existing transaction-local bypass so
+-- its protection trigger permits metadata-only updates without unlocking,
+-- deleting, or otherwise changing any exhibit.
+set local app.museum_internal = 'on';
+
 update public.inventory_gems
 set
   natural_mutation_ids = array(
@@ -50,6 +56,8 @@ set
   genuine_roll = roll_number is not null and coalesce((event_properties->>'duplicate')::boolean,false)=false
 where effective_rarity is null or (cardinality(natural_mutation_ids)=0 and cardinality(coalesce(mutation_ids,'{}'::text[]))>0)
    or (not genuine_roll and roll_number is not null);
+
+set local app.museum_internal = 'off';
 
 create schema if not exists paradox_private;
 revoke all on schema paradox_private from public,anon,authenticated;

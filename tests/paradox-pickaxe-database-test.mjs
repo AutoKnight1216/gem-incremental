@@ -14,7 +14,19 @@ await db.exec(`
   base_weight numeric not null,value_per_gram numeric,rolled_weight_multiplier numeric,rolled_weight numeric,final_weight numeric not null,value numeric not null,
   mutation_ids text[] default '{}',mutation_multipliers numeric[] default '{}',mutation_id text,mutation_multiplier numeric,mutation_chance_multiplier numeric default 1,
   roll_number bigint,luck_at_roll numeric,event_properties jsonb default '{}',locked boolean default false,museum_locked boolean default false,
-  source_event_occurrence_id uuid,source_event_key text,value_multiplier_at_roll numeric default 1);
+ source_event_occurrence_id uuid,source_event_key text,value_multiplier_at_roll numeric default 1);
+ create function public.prevent_museum_specimen_mutation() returns trigger language plpgsql as $$
+ begin
+  if old.museum_locked
+   and coalesce(current_setting('request.jwt.claim.role',true),'') <> 'service_role'
+   and coalesce(current_setting('app.museum_internal',true),'') <> 'on'
+  then raise exception 'museum_specimen_protected'; end if;
+  return case when tg_op='DELETE' then old else new end;
+ end $$;
+ create trigger inventory_gems_museum_guard before update or delete on public.inventory_gems
+ for each row execute function public.prevent_museum_specimen_mutation();
+ insert into public.inventory_gems(player_id,gem_name,rarity,base_weight,final_weight,value,mutation_ids,roll_number,locked,museum_locked)
+ values('00000000-0000-0000-0000-000000000099','Exhibited Test Gem',1000000000,1,1,1,array['charged'],1,true,true);
  create table public.game_recipes(id text primary key,recipe jsonb not null);
  create table public.crafting_progress(player_id uuid,recipe_id text,progress jsonb not null default '{}',updated_at timestamptz default now(),primary key(player_id,recipe_id));
  create table public.rare_roll_chat_events(player_id uuid,rarity numeric);
@@ -27,6 +39,14 @@ await db.exec(`
  create table economy_private.cash_paths(function_name text primary key,category text,direction text);
 `);
 await db.exec(readFileSync(new URL('../supabase/migrations/20261001123656_paradox_pickaxe.sql',import.meta.url),'utf8'));
+assert.deepEqual((await q("select museum_locked,locked,natural_mutation_ids,effective_rarity,genuine_roll from inventory_gems where gem_name='Exhibited Test Gem'"))[0],{
+ museum_locked:true,locked:true,natural_mutation_ids:['charged'],effective_rarity:'1000000000',genuine_roll:true
+});
+await assert.rejects(
+ ()=>q("update inventory_gems set value=2 where gem_name='Exhibited Test Gem'"),
+ /museum_specimen_protected/,
+ 'the transaction-local migration bypass must be disabled after the backfill'
+);
 
 const uid='00000000-0000-0000-0000-000000000001';
 await q("select set_config('request.jwt.claim.sub',$1,false)",[uid]);
