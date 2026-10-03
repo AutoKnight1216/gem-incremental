@@ -110,7 +110,8 @@ assert.match(page, /title: "Repay your loan\?"/);
 assert.match(page, /data-action="bankruptcy"/);
 assert.match(page, /title: "Declare bankruptcy\?"/);
 assert.match(page, /data\.in_default \? `<button/);
-assert.equal((page.match(/await confirmDialog\(/g) || []).length, 3, "borrow, repay and bankruptcy must each confirm");
+assert.equal((page.match(/await confirmDialog\(/g) || []).length, 5,
+  "borrow, repay, bankruptcy, cheque issue and cheque cancellation must each confirm");
 assert.match(html, /<link rel="stylesheet" href="\.\/bank\.css">/);
 assert.match(html, /id="savings"[\s\S]*id="credit"[\s\S]*id="loan"[\s\S]*id="ledger"/);
 
