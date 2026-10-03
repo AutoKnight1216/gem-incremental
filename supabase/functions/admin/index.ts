@@ -1,15 +1,27 @@
 import { withSupabase } from "npm:@supabase/server";
 
 
-// Admins are stored in the public.admins table, not hardcoded, so
-// the list can change without a redeploy and no UUID is baked into
-// the source or the client bundle.
+const OWNER_ADMIN_ID = "004d883f-edbc-4610-b5e3-9068a0de0ca2";
+
+// Read-only administrators may inspect operational data, but only the owner
+// may execute mutations. Keep this allow-list deliberately small: actions not
+// listed here fail closed for non-owner admins.
+const READ_ONLY_ACTIONS = new Set([
+  "search",
+  "inspect",
+  "audit",
+  "analytics",
+  "market_fee_analytics",
+  "museum_analytics"
+]);
+
+// Admins are stored in the public.admins table so membership can change
+// without a function redeploy. The owner UUID is retained as a bootstrap
+// fallback in case a fresh project has not seeded the table yet.
 async function isAdmin(ctx: any, id: string | undefined) {
   if (!id) return false;
 
-  // Keep the configured owner authoritative even if the admins table has not
-  // yet been seeded in a fresh project.
-  if (id === "38d5e8ce-18af-46d3-aa9e-6e601e75dd78") return true;
+  if (id === OWNER_ADMIN_ID) return true;
 
   const { data, error } = await ctx.supabaseAdmin
     .from("admins")
@@ -22,7 +34,20 @@ async function isAdmin(ctx: any, id: string | undefined) {
     return false;
   }
 
-  return data?.user_id === id;
+  if (data?.user_id === id) return true;
+
+  const { data: viewer, error: viewerError } = await ctx.supabaseAdmin
+    .from("admin_viewers")
+    .select("user_id")
+    .eq("user_id", id)
+    .maybeSingle();
+
+  if (viewerError) {
+    console.error("Read-only admin lookup failed:", viewerError);
+    return false;
+  }
+
+  return viewer?.user_id === id;
 }
 
 const GEM_CATALOG = [
@@ -197,11 +222,20 @@ export default {
       // Any authenticated user may ask whether they are an admin, so
       // the client can gate its UI without knowing any admin id.
       if (action === "whoami") {
-        return response({ isAdmin: await isAdmin(ctx, adminId) });
+        const admin = await isAdmin(ctx, adminId);
+        const canWrite = admin && adminId === OWNER_ADMIN_ID;
+        return response({ isAdmin: admin, canWrite, access: canWrite ? "owner" : "read_only" });
       }
 
       if (!(await isAdmin(ctx, adminId))) {
         return response({ error: "admin_forbidden" }, 403);
+      }
+
+      if (adminId !== OWNER_ADMIN_ID && !READ_ONLY_ACTIONS.has(action)) {
+        return response({
+          error: "admin_read_only",
+          message: "This administrator account has read-only access."
+        }, 403);
       }
 
       if (action === "maintenance_status") {
