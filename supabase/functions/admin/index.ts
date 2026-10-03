@@ -143,6 +143,37 @@ function finiteNumber(value: unknown) {
   return Number.isFinite(number) ? number : null;
 }
 
+function censoredEmail(value: unknown) {
+  const email = typeof value === "string" ? value.trim() : "";
+  if (!email) return null;
+
+  const separator = email.lastIndexOf("@");
+  if (separator <= 0 || separator === email.length - 1) return "***";
+
+  const local = email.slice(0, separator);
+  const domain = email.slice(separator + 1);
+  const dot = domain.indexOf(".");
+  const host = dot >= 0 ? domain.slice(0, dot) : domain;
+  const suffix = dot >= 0 ? domain.slice(dot) : "";
+  return `${local.slice(0, 1)}***@${host.slice(0, 1)}***${suffix}`;
+}
+
+function censorEmailsDeep(value: any): any {
+  if (typeof value === "string") {
+    return value.replace(
+      /[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}/gi,
+      (email) => censoredEmail(email) ?? "***"
+    );
+  }
+  if (Array.isArray(value)) return value.map(censorEmailsDeep);
+  if (value && typeof value === "object") {
+    return Object.fromEntries(
+      Object.entries(value).map(([key, nested]) => [key, censorEmailsDeep(nested)])
+    );
+  }
+  return value;
+}
+
 async function audit(ctx: any, adminId: string, targetId: string | null,
   action: string, details: Record<string, unknown> = {}) {
   const { error } = await ctx.supabaseAdmin
@@ -157,7 +188,7 @@ async function audit(ctx: any, adminId: string, targetId: string | null,
   if (error) console.error("Admin audit write failed:", error);
 }
 
-async function playerSummary(ctx: any, player: any) {
+async function playerSummary(ctx: any, player: any, hideEmail = false) {
   const [authResult, gemResult, equipmentResult, consumableResult, boostResult, titleResult] =
     await Promise.all([
       ctx.supabaseAdmin.auth.admin.getUserById(player.id),
@@ -175,7 +206,9 @@ async function playerSummary(ctx: any, player: any) {
 
   return {
     ...player,
-    email: authResult.data?.user?.email ?? null,
+    email: hideEmail
+      ? censoredEmail(authResult.data?.user?.email)
+      : authResult.data?.user?.email ?? null,
     isAnonymous: authResult.data?.user?.is_anonymous ?? false,
     bannedUntil: authResult.data?.user?.banned_until ?? null,
     gemCount: gemResult.count ?? 0,
@@ -227,11 +260,13 @@ export default {
         return response({ isAdmin: admin, canWrite, access: canWrite ? "owner" : "read_only" });
       }
 
-      if (!(await isAdmin(ctx, adminId))) {
+      const admin = await isAdmin(ctx, adminId);
+      if (!admin) {
         return response({ error: "admin_forbidden" }, 403);
       }
 
-      if (adminId !== OWNER_ADMIN_ID && !READ_ONLY_ACTIONS.has(action)) {
+      const canWriteAdmin = adminId === OWNER_ADMIN_ID;
+      if (!canWriteAdmin && !READ_ONLY_ACTIONS.has(action)) {
         return response({
           error: "admin_read_only",
           message: "This administrator account has read-only access."
@@ -462,14 +497,14 @@ export default {
             const user: any = users.get(player.id);
             return player.id.toLowerCase().includes(query) ||
               String(player.username ?? "").toLowerCase().includes(query) ||
-              String(user?.email ?? "").toLowerCase().includes(query);
+              (canWriteAdmin && String(user?.email ?? "").toLowerCase().includes(query));
           })
           .slice(0, 50)
           .map((player: any) => {
             const user: any = users.get(player.id);
             return {
               ...player,
-              email: user?.email ?? null,
+              email: canWriteAdmin ? user?.email ?? null : censoredEmail(user?.email),
               isAnonymous: user?.is_anonymous ?? false,
               bannedUntil: user?.banned_until ?? null
             };
@@ -494,7 +529,10 @@ export default {
             message: "Audit storage is unavailable in this deployment. Run the latest admin observability migration."
           });
         }
-        return response({ entries: data ?? [], degraded: false });
+        return response({
+          entries: canWriteAdmin ? data ?? [] : censorEmailsDeep(data ?? []),
+          degraded: false
+        });
       }
 
 
@@ -715,7 +753,7 @@ export default {
         if (error || !player) return response({ error: "player_not_found" }, 404);
 
         const [summary, gems, equipment] = await Promise.all([
-          playerSummary(ctx, player),
+          playerSummary(ctx, player, !canWriteAdmin),
           ctx.supabaseAdmin.from("inventory_gems")
             .select("id, gem_name, rarity, final_weight, value, locked, created_at")
             .eq("player_id", targetId).order("created_at", { ascending: false }).limit(100),
