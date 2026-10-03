@@ -37,6 +37,8 @@ const migration=readFileSync(new URL('../supabase/migrations/20260909104511_econ
 await db.exec(migration);
 const correctionsMigration=readFileSync(new URL('../supabase/migrations/20260914000613_economy_historical_corrections.sql',import.meta.url),'utf8');
 await db.exec(correctionsMigration);
+const compactionMigration=readFileSync(new URL('../supabase/migrations/20261003005215_compact_economy_cash_ledger.sql',import.meta.url),'utf8');
+await db.exec(compactionMigration);
 const summary=async(period='All')=>(await q('select admin_get_economy_breakdown($1) d',[period]))[0].d;
 let d=await summary();
 assert.equal(d.balanceEvents,0);assert.equal(d.totalMoneySupply,15000);assert.equal(d.cashCreated,0);assert.deepEqual(d.breakdown,[]);
@@ -47,7 +49,10 @@ await q("select set_config('request.jwt.claim.sub',$1,false)",[uid]);
 for(const role of ['anon','authenticated']){
  assert.equal((await q("select has_table_privilege($1,'public.economy_cash_ledger','INSERT') allowed",[role]))[0].allowed,false);
  assert.equal((await q("select has_table_privilege($1,'economy_private.cash_correction_annotations','SELECT') allowed",[role]))[0].allowed,false);
+ assert.equal((await q("select has_table_privilege($1,'economy_private.cash_ledger_archive_chunks','SELECT') allowed",[role]))[0].allowed,false);
+ assert.equal((await q("select has_table_privilege($1,'economy_private.cash_ledger_daily_rollups','SELECT') allowed",[role]))[0].allowed,false);
  assert.equal((await q("select has_function_privilege($1,'public.admin_adjust_economy_cash(uuid,uuid,numeric)','EXECUTE') allowed",[role]))[0].allowed,false);
+ assert.equal((await q("select has_function_privilege($1,'economy_private.compact_cash_ledger_batch(timestamptz,integer)','EXECUTE') allowed",[role]))[0].allowed,false);
 }
 assert.equal((await q("select has_function_privilege('anon','public.admin_get_economy_breakdown(text)','EXECUTE') allowed"))[0].allowed,false);
 assert.equal((await q("select has_function_privilege('authenticated','public.admin_get_economy_breakdown(text)','EXECUTE') allowed"))[0].allowed,true);
@@ -122,6 +127,35 @@ await db.exec(`create function test_boundary() returns numeric language plpgsql 
 insert into public.economy_cash_ledger(created_at,account,amount,direction,category,subcategory) values(statement_timestamp()-interval '1 hour','wallet',11,'source','gem_sales','boundary'),(statement_timestamp()-interval '1 hour'-interval '1 microsecond','wallet',17,'source','gem_sales','outside');
 return (public.admin_get_economy_breakdown('1H')->>'cashCreated')::numeric;end$$;`);
 assert.equal(Number((await q('select test_boundary() n'))[0].n),11);
+// Old high-volume gem sales move to exact compressed chunks plus reporting
+// rollups. Reviewed rows stay in the raw ledger, and All-time totals do not move.
+const oldGemRows=await q(`insert into economy_cash_ledger(
+ created_at,transaction_id,player_id,account,amount,direction,category,subcategory,reference,metadata
+) values
+ (now()-interval '10 days',81001,$1,'wallet',21.25,'source','gem_sales','sell_inventory_gem','sale:a','{"before":100,"after":121.25,"marker":"a"}'),
+ (now()-interval '10 days',81002,$1,'wallet',9.75,'source','gem_sales','sell_inventory_gem','sale:b','{"before":121.25,"after":131,"marker":"b"}'),
+ (now()-interval '10 days',81003,$1,'wallet',4,'source','gem_sales','sell_inventory_gem','sale:reviewed','{"marker":"reviewed"}')
+ returning id`,[other]);
+await q(`insert into economy_private.cash_correction_annotations(ledger_id,correction_type,reason)
+ values($1,'reviewed_test','Must remain individually addressable')`,[oldGemRows[2].id]);
+const beforeCompaction=await summary();
+const compacted=(await q("select economy_private.compact_cash_ledger_batch(date_trunc('day',now())-interval '8 days',100) result"))[0].result;
+assert.equal(compacted.status,'archived');
+assert.equal(compacted.archivedRows,2);
+assert.equal((await q('select count(*) n from economy_private.cash_ledger_archive_chunks'))[0].n,1);
+assert.equal(Number((await q('select sum(entries) n from economy_private.cash_ledger_daily_rollups'))[0].n),2);
+assert.equal((await q('select count(*) n from economy_cash_ledger where id=any($1::bigint[])',[oldGemRows.map(r=>r.id)]))[0].n,1);
+const recovered=await q('select * from economy_private.read_archived_cash_ledger($1,$2,100)',[oldGemRows[0].id,oldGemRows[1].id]);
+assert.deepEqual(recovered.map(r=>r.id),oldGemRows.slice(0,2).map(r=>r.id));
+assert.deepEqual(recovered.map(r=>r.reference),['sale:a','sale:b']);
+assert.deepEqual(recovered.map(r=>r.metadata.marker),['a','b']);
+const afterCompaction=await summary();
+assert.equal(afterCompaction.cashCreated,beforeCompaction.cashCreated);
+assert.equal(afterCompaction.balanceEvents,beforeCompaction.balanceEvents);
+await assert.rejects(
+ ()=>q("select economy_private.compact_cash_ledger_batch(now()-interval '1 day',100)"),
+ /cash_ledger_cutoff_must_retain_eight_days/
+);
 // Deletion preserves telemetry even when bank rows cascade away.
 const beforeDeletion=await summary();
 await q('delete from players where id=$1',[uid]);
@@ -130,7 +164,7 @@ assert.ok((await q("select count(*) n from economy_cash_ledger where category='a
 d=await summary();
 assert.equal(d.cashDestroyed,beforeDeletion.cashDestroyed);
 assert.ok(d.breakdown.some(r=>r.direction==='correction' && r.category==='account_removal'));
-const actual=Number((await q("select sum(amount) n from economy_cash_ledger where account<>'clearing'"))[0].n);
+const actual=Number((await q("select (select sum(amount) from economy_cash_ledger where account<>'clearing') + (select coalesce(sum(amount),0) from economy_private.cash_ledger_daily_rollups where account<>'clearing') n"))[0].n);
 const excludedChange=Number((await q("select coalesce(sum(amount),0) n from economy_cash_ledger where player_id=$1 and account<>'clearing'",[excluded]))[0].n);
 assert.ok(Math.abs((actual-excludedChange)-(d.netCreation+d.transferNet+d.correctionNet+d.unclassifiedNet))<1e-7);
 assert.ok(Math.abs(Number(d.reconciliationDifference))<1e-7);

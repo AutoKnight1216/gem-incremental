@@ -57,8 +57,8 @@ assert.doesNotMatch(roll.slice(roll.indexOf("const rollNumber"), roll.indexOf("c
 assert.doesNotMatch(page, /Math\.pow\(2|2 \*\*/);
 assert.doesNotMatch(page, /private_feature_gems[\s\S]{0,500}\.order\("multiplier"/);
 assert.match(page, /const BAND_PAGE_SIZE = 24/);
-assert.match(page, /"transcendent", "secret", "anomalous"/,
-  "Anomalous must render directly below Secret");
+assert.match(page, /"transcendent", "secret", "limited", "anomalous"/,
+  "Limited must render between Secret and Anomalous");
 assert.match(page, /renderBandContents\(band, band\.dataset\.tierBand\)/,
   "opening a band should render only that band instead of rebuilding the full index");
 assert.match(page, /\["name", "found"\]\.includes\(gemSort\.value\)/,

@@ -19,7 +19,7 @@ assert.match(source, /function exactCombinationDiscovered\(entry\)[\s\S]*discove
 assert.match(source, /Gem identified; this exact mutation combination has not been found\./);
 assert.doesNotMatch(source, /UNKNOWN_TIER/,
   "locked cards should remain in the visible Secret rarity category");
-assert.match(source, /function displayTier\(entry\)[\s\S]*rarityTier\(entry\.gem\.rarity, entry\.gem\.name\)/);
+assert.match(source, /function baseTier\(entry\)[\s\S]*rarityTier\(entry\.gem\.rarity, entry\.gem\.name\)/);
 assert.match(source, /const searchableName = identityDiscovered\(entry\) \? entry\.gem\.name\.toLowerCase\(\) : ""/,
   "search must not reveal locked names");
 

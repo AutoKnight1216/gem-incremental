@@ -15,6 +15,7 @@ const INVENTORY_GEM_COLUMNS = `
   event_properties,
   gem_name,
   rarity,
+  effective_rarity,
   base_weight,
   value_per_gram,
   rolled_weight_multiplier,

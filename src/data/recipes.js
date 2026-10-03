@@ -1499,17 +1499,18 @@ const recipes = [
       { type: "consumable", consumableId: "lucky-potion-1", amount: 5 },
       { type: "consumable", consumableId: "fortune-potion-1", amount: 5 }
     ],
-    moneyCost: 5000,
-    reward: { type: "consumable", id: "money-up-potion", name: "Money Up Potion", family: "gemValue", tier: 1, amount: 1, effectValue: 1.5 }
+    moneyCost: 25000,
+    reward: { type: "consumable", id: "money-up-potion", name: "Money Up Potion", family: "gemValue", tier: 1, amount: 1, effectValue: 1.1 }
   },
   {
     id: "money-up-potion-2", name: "Money Up Potion II", category: "potion",
     requirements: [
       { type: "consumable", consumableId: "lucky-potion-2", amount: 5 },
-      { type: "consumable", consumableId: "fortune-potion-2", amount: 5 }
+      { type: "consumable", consumableId: "fortune-potion-2", amount: 5 },
+      { type: "consumable", consumableId: "money-up-potion", amount: 3 }
     ],
-    moneyCost: 25000,
-    reward: { type: "consumable", id: "money-up-potion-2", name: "Money Up Potion II", family: "gemValue", tier: 2, amount: 1, effectValue: 2 }
+    moneyCost: 100000,
+    reward: { type: "consumable", id: "money-up-potion-2", name: "Money Up Potion II", family: "gemValue", tier: 2, amount: 1, effectValue: 1.25 }
   }
 ];
 

@@ -102,6 +102,14 @@ export const supersizerRecipes=[
  ]),consumeMaterials:true,description:'The mining industry said this was excessive. We made it bigger.',
  reward:{id:'supersizer-pickaxe',name:'Supersizer Pickaxe',category:'pickaxe',tier:18,bonus:{...pickaxeBonus('supersizer-pickaxe'),finalSell:.25}}}
 ];
+export const paradoxRecipes=[{
+ ...pick('paradox-pickaxe','Paradox Pickaxe',4000000000,[
+  {type:'equipment',equipmentId:'celestial-pickaxe',consume:false},
+  {id:'paradox-workspace',type:'paradox-workspace',amount:1,label:'Paradox recipe and Final Trial'}
+ ]),horizontal:false,consumeMaterials:true,paradoxWorkspace:true,
+ description:'Resolve impossible specimens into a generalist pickaxe that turns contradictions into escalating rolls.',
+ reward:{id:'paradox-pickaxe',name:'Paradox Pickaxe',category:'pickaxe',tier:16,bonus:pickaxeBonus('paradox-pickaxe')}
+}];
 export const impossibleRecipes=[{
  ...pick('impossible-pickaxe','The Impossible Pickaxe',2500000000,[
   {type:'impossible-safe-sacrifice',amount:1,label:'Reviewed shared sacrifice plan'},
@@ -121,7 +129,7 @@ export const impossibleRecipes=[{
  reward:{id:'impossible-pickaxe',name:'The Impossible Pickaxe',category:'pickaxe',tier:19,bonus:pickaxeBonus('impossible-pickaxe')}
 }];
 export function applyEquipmentOverhaul(recipes) {
- const replacements=new Map([...secondaryRecipes,...specialistRecipes,...fiveItemRecipes,...realityBedrockRecipes,...supersizerRecipes,...impossibleRecipes].map(r=>[r.id,r]));
+ const replacements=new Map([...secondaryRecipes,...specialistRecipes,...fiveItemRecipes,...realityBedrockRecipes,...supersizerRecipes,...paradoxRecipes,...impossibleRecipes].map(r=>[r.id,r]));
  const retired = new Set(['neutron-boots','spacetime-walkers','reality-breakers','singularity-vault','bottomless-singularity','event-horizon-vault','omnidimensional-vault']);
  const result=recipes.filter(r=>!replacements.has(r.id)&&!retired.has(r.id)).map(original=>{
   const r=structuredClone(original);

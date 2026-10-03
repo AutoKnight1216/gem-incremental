@@ -36,6 +36,8 @@ export const MARKET_REFERENCE_PRICES = Object.freeze({
   "enchanted-pet-toy": 2000000,
   "celestial-pet-charm": 7500000,
   "mythic-pet-whistle": 20000000,
+  "money-up-potion": 25000,
+  "money-up-potion-2": 100000,
   "plastic-bag": 0.10
 });
 
@@ -94,8 +96,8 @@ consumables.push(
 );
 
 consumables.push(
-  { id: "money-up-potion", name: "Money Up Potion", family: "gemValue", tier: 1, durationMs: 60_000, effectValue: 1.5, description: "×1.5 Auto Sell value for 60 seconds.", shop: { purchasable: false, price: null } },
-  { id: "money-up-potion-2", name: "Money Up Potion II", family: "gemValue", tier: 2, durationMs: 60_000, effectValue: 2, description: "×2 Auto Sell value for 60 seconds.", shop: { purchasable: false, price: null } }
+  { id: "money-up-potion", name: "Money Up Potion", family: "gemValue", tier: 1, durationMs: 60_000, effectValue: 1.1, description: "×1.1 Auto Sell value for 60 seconds.", shop: { purchasable: false, price: null } },
+  { id: "money-up-potion-2", name: "Money Up Potion II", family: "gemValue", tier: 2, durationMs: 60_000, effectValue: 1.25, description: "×1.25 Auto Sell value for 60 seconds.", shop: { purchasable: false, price: null } }
 );
 
 consumables.push({ id: "plastic-bag", name: "Plastic Bag", family: "material", tier: 0,

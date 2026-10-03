@@ -62,6 +62,14 @@ label.setting {
   cursor: pointer;
 }
 
+/* Batch requirements are intentionally descriptive. Keep the native select
+   inside the card instead of letting its longest locked option size the row. */
+#batchSize {
+  width: min(30rem, 100%);
+  max-width: 100%;
+  min-width: 0;
+}
+
 @media (max-width: 560px) {
   .setting {
     flex-direction: column;

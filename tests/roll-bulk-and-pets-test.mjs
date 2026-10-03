@@ -10,10 +10,11 @@ const totals = equipmentTotals([
 assert.equal(totals.rollBulk, 4);
 assert.equal(totals.petLuck, 3);
 
-const access = { genuineRolls: 500000, hasCelestialPickaxe: true, rollBulk: 4 };
-assert.equal(getMaximumBatchSize(access), 8);
+const access = { totalRolls: 500000, hasCelestialPickaxe: true, specialistPickaxes: 3, rollBulk: 4 };
+assert.equal(getMaximumBatchSize(access), 9);
 assert.equal(isBatchSizeUnlocked(4, access), true);
-assert.equal(isBatchSizeUnlocked(8, access), true);
-assert.equal(isBatchSizeUnlocked(9, access), false);
-assert.match(renderBatchOptions(access), /×8/);
+assert.equal(isBatchSizeUnlocked(5, access), true);
+assert.equal(isBatchSizeUnlocked(9, access), true);
+assert.equal(isBatchSizeUnlocked(10, access), false);
+assert.match(renderBatchOptions(access), /×9/);
 console.log("roll bulk tests passed");

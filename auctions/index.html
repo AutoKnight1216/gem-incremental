@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <meta name="color-scheme" content="dark light">
   <meta name="theme-color" content="#0b0e14">
-  <meta name="description" content="Buy and sell gems at the Gem Incremental market.">
+  <meta name="description" content="Bid on player-run Gem Incremental auctions.">
 
   <title>Market · Gem Incremental</title>
 
@@ -42,10 +42,9 @@
   <main class="app-main">
     <div class="page-head">
       <div class="page-head__title">
-        <h1>Market</h1>
+        <h1>Auction House</h1>
         <p class="page-head__sub">
-          Buy listings outright, or post an order for a gem you want and
-          let someone fill it.
+          Bid on player lots or auction your own gems and consumables.
         </p>
       </div>
 
@@ -58,10 +57,7 @@
 
     <div class="segmented tabs" role="tablist" aria-label="Market">
       <button id="browseTab" class="segmented__item tab-button active" role="tab" type="button" aria-selected="true">
-        Buy
-      </button>
-      <button id="ordersTab" class="segmented__item tab-button" role="tab" type="button" aria-selected="false">
-        Orders
+        Browse
       </button>
       <button id="sellTab" class="segmented__item tab-button" role="tab" type="button" aria-selected="false">
         Sell
@@ -71,7 +67,7 @@
       </button>
     </div>
 
-    <!-- BROWSE (buy now) -->
+    <!-- BROWSE AUCTIONS -->
     <section id="browseSection">
       <div id="browseList" class="auction-grid">
         <div class="skeleton skeleton--card"></div>
@@ -80,55 +76,15 @@
       </div>
     </section>
 
-    <!-- ORDERS (buy order book) -->
-    <section id="ordersSection" class="hidden">
-      <div class="card order-form">
-        <h2 class="sell-card__title">Post a buy order</h2>
-        <p class="sell-card__hint">
-          Name a gem and what you’ll pay for it. The money is held now;
-          anyone who owns that gem can fill your order. Cancel any time for
-          a refund. Unfilled orders expire and refund you after three days.
-        </p>
-        <div class="sell-row">
-          <div class="sell-field">
-            <label class="field-label" for="orderGem">Gem</label>
-            <select class="select auction-select" id="orderGem"></select>
-          </div>
-          <div class="sell-field">
-            <label class="field-label" for="orderPrice">You pay</label>
-            <div class="auction-money-input">
-              <span class="auction-money-input__prefix">$</span>
-              <input id="orderPrice" type="number" min="1" step="1" value="1000" inputmode="numeric">
-            </div>
-          </div>
-        </div>
-        <p class="sell-card__hint" id="orderFeePreview"></p>
-        <p class="sell-card__hint" id="orderPriceRange"></p>
-        <button class="btn" id="watchGemButton" type="button">Watch this gem</button>
-        <button class="btn btn--primary btn--block" id="orderButton" type="button">Post order</button>
-      </div>
-
-      <div class="card market-watchlist" id="marketWatchlist" aria-live="polite"></div>
-
-      <div class="order-board-head">
-        <h2>Open orders</h2>
-        <p>Own a matching gem? Fill an order to sell it instantly.</p>
-      </div>
-      <div id="ordersList" class="auction-grid">
-        <div class="skeleton skeleton--card"></div>
-        <div class="skeleton skeleton--card"></div>
-      </div>
-    </section>
-
     <!-- SELL -->
     <section id="sellSection" class="hidden">
       <div class="card sell-card">
-        <h2 class="sell-card__title">List items for sale</h2>
+        <h2 class="sell-card__title">Create an auction</h2>
         <p class="sell-card__hint">
-          Build a lot from your gems, relics and potions — sell one thing or
-          bundle many together at a fixed price. It leaves your inventory
-          while listed and returns if nobody buys it before the timer ends.
-          You can have up to <strong>3 listings</strong> at once.
+          Build a lot from your gems, relics and consumables. The lot leaves
+          your inventory while listed and returns if nobody bids. The listing
+          fee is charged now and is never refunded. You can have up to
+          <strong>3 auctions</strong> at once.
         </p>
 
         <div class="sell-columns">
@@ -142,8 +98,8 @@
           </div>
 
           <div class="sell-column">
-            <label class="field-label">Potions</label>
-            <div id="sellPotionList" class="lot-picker" role="group" aria-label="Potions to add"></div>
+            <label class="field-label">Consumables</label>
+            <div id="sellPotionList" class="lot-picker" role="group" aria-label="Consumables to add"></div>
           </div>
         </div>
 
@@ -157,17 +113,16 @@
 
         <div class="sell-row">
           <div class="sell-field">
-            <label class="field-label" for="sellPrice">Price</label>
+            <label class="field-label" for="sellPrice">Starting bid</label>
             <div class="auction-money-input">
               <span class="auction-money-input__prefix">$</span>
-              <input id="sellPrice" type="number" min="1" step="1" value="100" inputmode="numeric">
+              <input id="sellPrice" type="number" min="0.0001" step="any" value="100" inputmode="decimal">
             </div>
           </div>
 
           <div class="sell-field">
             <label class="field-label" for="sellDuration">Duration</label>
             <select class="select auction-select" id="sellDuration">
-              <option value="1">1 hour</option>
               <option value="6">6 hours</option>
               <option value="12">12 hours</option>
               <option value="24" selected>24 hours</option>
@@ -181,19 +136,17 @@
         <p class="sell-card__hint" id="sellPriceMinimum"></p>
 
         <button class="btn btn--primary btn--block" id="listButton" type="button" disabled>
-          List for sale
+          Create auction
         </button>
       </div>
     </section>
 
-    <!-- MINE (my listings + my orders) -->
+    <!-- MY AUCTIONS -->
     <section id="mineSection" class="hidden">
-      <div class="order-board-head"><h2>My listings</h2></div>
+      <div class="order-board-head"><h2>My auctions</h2></div>
       <div id="mineList" class="auction-grid">
         <div class="skeleton skeleton--card"></div>
       </div>
-      <div class="order-board-head" style="margin-top:24px"><h2>My orders</h2></div>
-      <div id="myOrdersList" class="auction-grid"></div>
     </section>
   </main>
 

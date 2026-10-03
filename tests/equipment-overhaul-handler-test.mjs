@@ -41,6 +41,7 @@ const rollContext=()=>({
  qol:{settings:qolSettings,discoveries:['Test gem']},activeBoosts:boosts,oneRollBoost:oneRoll,
  activeAdminEvent:admin,globalEvent:null,crystalEffects:{luckBonus:2,finalLuckMultiplier:3},
  expeditionArtifactEffects:{luckBonus:3},guild:{membership:null,shopBuffIds:[]},
+ deepcoreContext:null,deepSeaContext:null,pets:[],equipmentBonusRows:equipment,contextWarnings:[],
  catalogVersions:{gems:1,mutations:1},
  gemCatalog:[{name:'Test gem',rarity:100000,base_weight:100,value_per_gram:2,affected_by_luck:true,availability_mode:'always',special_gem:false},{name:'Quartz',rarity:2,base_weight:1,value_per_gram:1,affected_by_luck:true,availability_mode:'always',special_gem:false}],
  mutationCatalog:[{id:'polished',name:'Polished',chance:100,multiplier:1.5}]
@@ -48,15 +49,25 @@ const rollContext=()=>({
 const client={from:t=>new Query(t),rpc:async(name,args)=>{
  rpcs.push(name);
  if(name==='sell_inventory_gem' && saleFailure)return {data:null,error:{message:"sale_failed"}};
- if(name==='roll_prepare_context')return {data:rollContext(),error:null};
+ if(name==='roll_prepare_context_v2')return {data:rollContext(),error:null};
  if(name==='roll_finish_bookkeeping'){
   if(args.p_phase==='critical')return {data:{lifetimeStats:{total_rolls:5001},mutationCombination:{},guildPoints:null,globalEventProgress:null,errors:[]},error:null};
   if(args.p_phase==='background'&&args.p_payload.consumeOneRollCharge)oneRoll=null;
   return {data:{errors:[]},error:null};
  }
- const responses={roll_autocraft_deposit:craftResponse,qol_roll_context:{settings:qolSettings,discoveries:['Test gem']},sell_inventory_gem:123,bundle_route_roll:bundleResponse,crystal_player_effects:{luckBonus:2,finalLuckMultiplier:3},player_expedition_artifact_effects:{luckBonus:3},
+ const responses={qol_roll_context:{settings:qolSettings,discoveries:['Test gem']},crystal_player_effects:{luckBonus:2,finalLuckMultiplier:3},player_expedition_artifact_effects:{luckBonus:3},
   claim_equipment_roll_batch:{status:'claimed',genuineRoll:5001,leaseId:'lease',nextRollAt:new Date(Date.now()+1000).toISOString(),mythicSurge:{active:false,boosted:false,progress:0}},record_server_roll:{total_rolls:5001}};
- if(name==='commit_equipment_roll'){commits.push(args);player.total_rolls+=1;Object.assign(player,args.p_player_patch);return {data:{bonus:args.p_bonus?{id:102,...args.p_bonus}:null,bookkeeping:{lifetimeStats:{total_rolls:player.total_rolls},mutationCombination:{},guildPoints:null,globalEventProgress:null,errors:[]}},error:null};}
+ if(name==='roll_route_result'){
+  const bundle=args.p_external_deposit?{status:args.p_external_deposit,keepInInventory:false}:args.p_filter_keep?{status:'kept',keepInInventory:true}:bundleResponse;
+  const autoCraft=craftActive&&bundle.status!=='deposited'&&!bundle.keepInInventory?craftResponse:{deposited:false,preserved:false};
+  return {data:{bundle,autoCraft},error:null};
+ }
+ if(name==='roll_commit_result'){
+  commits.push(args);player.total_rolls+=1;Object.assign(player,args.p_player_patch);
+  saved=args.p_save_primary&&!args.p_relic_drop?{id:101,...args.p_primary_specimen}:null;
+  const sold=args.p_auto_sell&&!saleFailure;
+  return {data:{primary:saved,duplicate:args.p_duplicate?{id:103,...args.p_duplicate}:null,leaseReleased:args.p_release_on_success,sale:{sold,money:sold?123:null,error:args.p_auto_sell&&saleFailure?'sale_failed':null},equipment:{bonus:args.p_bonus?{id:102,...args.p_bonus}:null,bookkeeping:{lifetimeStats:{total_rolls:player.total_rolls},mutationCombination:{},guildPoints:null,globalEventProgress:null,errors:[]}}},error:null};
+ }
  return {data:responses[name]??null,error:null};
 }};
 async function run(id,state={},enchant=null) {

@@ -15,6 +15,52 @@ const EQUIPMENT_MUTATION_FAMILIES = Object.freeze({
   "supersizer-gargantuan": "supersizer-pickaxe"
 });
 
+const LIMITED_EVENT_NAMES = Object.freeze({
+  twentiethite: "Gem Incremental's Twentieth Day",
+  monthstone: "the Month One anniversary"
+});
+
+function titleCaseEventKey(value) {
+  return String(value ?? "")
+    .trim()
+    .replaceAll("_", " ")
+    .replaceAll("-", " ")
+    .replace(/\b\w/g, (letter) => letter.toUpperCase());
+}
+
+function anniversaryEventName(value) {
+  const match = /^month[-_ ](\d+)$/i.exec(String(value ?? "").trim());
+  if (!match) return "";
+  const monthNames = { 1: "One", 2: "Two", 3: "Three" };
+  const number = Number(match[1]);
+  return `the Month ${monthNames[number] ?? number} anniversary`;
+}
+
+export function isLimitedEventGem(gem = {}) {
+  return gem.metadata?.limited === true ||
+    ["date_range", "date_range_daily"].includes(String(gem.availabilityMode ?? ""));
+}
+
+export function limitedEventName(gem = {}) {
+  const configured = gem.metadata?.limitedEventName ?? gem.metadata?.eventName;
+  if (configured) return String(configured);
+  if (gem.metadata?.deepcore_stage != null) return "the Deepcore Project 2026";
+  const anniversary = anniversaryEventName(gem.metadata?.anniversary);
+  if (anniversary) return anniversary;
+  const known = LIMITED_EVENT_NAMES[String(gem.name ?? "").trim().toLowerCase()];
+  if (known) return known;
+  const marker = String(gem.metadata?.indexMarker ?? "").replace(/^limited\s*[•·:-]?\s*/i, "").trim();
+  return marker ? titleCaseEventKey(marker) : "a limited-time event";
+}
+
+export function gemEventSourceLabel(gem = {}) {
+  if (isLimitedEventGem(gem)) return `Obtained from ${limitedEventName(gem)}`;
+  if (gem.availabilityMode === "global_event" && gem.requiredEventKey) {
+    return `Obtained during ${titleCaseEventKey(gem.requiredEventKey)}`;
+  }
+  return "";
+}
+
 export function canonicalMutationIds(ids = [], validIds = null) {
   return Array.from(new Set((Array.isArray(ids) ? ids : [])
     .map((id) => String(id ?? "").trim().toLowerCase())

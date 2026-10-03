@@ -44,6 +44,7 @@ const rollContext=()=>({
  qol:{settings:qolSettings,discoveries:['Test gem']},activeBoosts:boosts,oneRollBoost:oneRoll,
  activeAdminEvent:admin,globalEvent:null,crystalEffects:{luckBonus:2,finalLuckMultiplier:3},
  expeditionArtifactEffects:{luckBonus:3},guild:{membership:null,shopBuffIds:[]},
+ deepcoreContext:null,deepSeaContext:null,pets:[],equipmentBonusRows:equipment,contextWarnings:[],
  catalogVersions:{gems:1,mutations:activeMutationCatalogVersion},
  gemCatalog:[{name:'Test gem',rarity:100000,base_weight:100,value_per_gram:2,affected_by_luck:true,availability_mode:'always',special_gem:false},{name:'Quartz',rarity:2,base_weight:1,value_per_gram:1,affected_by_luck:true,availability_mode:'always',special_gem:false}],
  mutationCatalog:activeMutationCatalog
@@ -51,8 +52,8 @@ const rollContext=()=>({
 const client={from:t=>new Query(t),rpc:async(name,args)=>{
  rpcs.push(name);rpcCalls.push({name,args:structuredClone(args)});
  if(name==='sell_inventory_gem' && saleFailure)return {data:null,error:{message:"sale_failed"}};
- if(name==='roll_prepare_context')return {data:rollContext(),error:null};
- if(name==='roll_begin_batch_subroll')return {data:{context:rollContext(),mythicSurge:{active:false,boosted:false,progress:0}},error:null};
+ if(name==='roll_prepare_context_v2')return {data:rollContext(),error:null};
+ if(name==='roll_begin_batch_subroll_v2')return {data:{context:rollContext(),mythicSurge:{active:false,boosted:false,progress:0}},error:null};
  if(name==='roll_finish_bookkeeping'){
   if(args.p_phase==='critical'){
    player.total_rolls+=1;
@@ -61,13 +62,20 @@ const client={from:t=>new Query(t),rpc:async(name,args)=>{
   if((args.p_phase==='background'||args.p_phase==='loss')&&args.p_payload.consumeOneRollCharge)oneRoll=null;
   return {data:{errors:[]},error:null};
  }
- const responses={roll_autocraft_deposit:craftResponse,qol_roll_context:{settings:qolSettings,discoveries:['Test gem']},sell_inventory_gem:123,bundle_route_roll:bundleResponse,crystal_player_effects:{luckBonus:2,finalLuckMultiplier:3},player_expedition_artifact_effects:{luckBonus:3},
+ const responses={qol_roll_context:{settings:qolSettings,discoveries:['Test gem']},crystal_player_effects:{luckBonus:2,finalLuckMultiplier:3},player_expedition_artifact_effects:{luckBonus:3},
   claim_equipment_roll_batch:{status:'claimed',genuineRoll:5001,leaseId:'lease',nextRollAt:new Date(Date.now()+1000).toISOString(),mythicSurge:{active:false,boosted:false,progress:0}},record_server_roll:{total_rolls:5001}};
- if(name==='commit_equipment_roll'){
+ if(name==='roll_route_result'){
+  const bundle=args.p_external_deposit?{status:args.p_external_deposit,keepInInventory:false}:args.p_filter_keep?{status:'kept',keepInInventory:true}:bundleResponse;
+  const autoCraft=craftActive&&bundle.status!=='deposited'&&!bundle.keepInInventory?craftResponse:{deposited:false,preserved:false};
+  return {data:{bundle,autoCraft},error:null};
+ }
+ if(name==='roll_commit_result'){
   commits.push(args);player.equipment_state=structuredClone(args.p_state);Object.assign(player,args.p_player_patch);
   player.total_rolls+=1;
   if(args.p_include_background&&args.p_bookkeeping.consumeOneRollCharge)oneRoll=null;
-  return {data:{bonus:args.p_bonus?{id:102,...args.p_bonus}:null,bookkeeping:{lifetimeStats:{total_rolls:player.total_rolls},mutationCombination:{},guildPoints:null,globalEventProgress:null,errors:[]},backgroundBookkeeping:args.p_include_background?{errors:[]}:null},error:null};
+  saved=args.p_save_primary&&!args.p_relic_drop?{id:101,...args.p_primary_specimen}:null;
+  const sold=args.p_auto_sell&&!saleFailure;
+  return {data:{primary:saved,duplicate:args.p_duplicate?{id:103,...args.p_duplicate}:null,leaseReleased:args.p_release_on_success,sale:{sold,money:sold?123:null,error:args.p_auto_sell&&saleFailure?'sale_failed':null},equipment:{bonus:args.p_bonus?{id:102,...args.p_bonus}:null,bookkeeping:{lifetimeStats:{total_rolls:player.total_rolls},mutationCombination:{},guildPoints:null,globalEventProgress:null,errors:[]},backgroundBookkeeping:args.p_include_background?{errors:[]}:null}},error:null};
  }
  if(name==='commit_jackpot_loss'){player.equipment_state=structuredClone(args.p_state);player.total_rolls+=1;return {data:{total_rolls:player.total_rolls},error:null};}
  if(name==='record_server_roll'){player.total_rolls+=1;return {data:{total_rolls:player.total_rolls},error:null};}
@@ -219,9 +227,11 @@ assert.deepEqual(batch.results.map(entry=>entry.luckBreakdown.oneRoll),[1000,0,0
 assert.ok(batch.results[0].luckAtRoll>batch.results[1].luckAtRoll);
 assert.equal(player.total_rolls,5004);
 assert.equal(rpcs.filter(name=>name==='claim_equipment_roll_batch').length,1);
-assert.equal(rpcs.filter(name=>name==='commit_equipment_roll').length,4);
-assert.equal(rpcCalls.filter(call=>call.name==='roll_prepare_context').length,1);
-assert.equal(rpcCalls.filter(call=>call.name==='roll_begin_batch_subroll').length,3);
+assert.equal(rpcs.filter(name=>name==='roll_commit_result').length,4);
+assert.equal(rpcCalls.filter(call=>call.name==='roll_prepare_context_v2').length,1);
+assert.equal(rpcCalls.filter(call=>call.name==='roll_begin_batch_subroll_v2').length,3);
+assert.equal(rpcs.filter(name=>name==='roll_route_result').length,4);
+assert.equal(rpcs.filter(name=>name==='release_server_roll').length,0);
 assert.equal(rpcCalls.filter(call=>call.name==='claim_guild_mythic_surge').length,0);
 assert.equal(rpcCalls.filter(call=>call.name==='roll_finish_bookkeeping'&&call.args.p_phase==='critical').length,0);
 assert.equal(rpcCalls.filter(call=>call.name==='roll_finish_bookkeeping'&&call.args.p_phase==='background').length,0);
@@ -239,7 +249,7 @@ for(const entry of allInBatch.results) {
  assert.equal(entry.gem.flatChanceMultiplier,4);
 }
 assert.deepEqual(allInBatch.results.map(entry=>entry.luckBreakdown.oneRoll),[0,0,0,0]);
-assert.equal(rpcs.filter(name=>name==='commit_equipment_roll').length,4);
+assert.equal(rpcs.filter(name=>name==='roll_commit_result').length,4);
 console.log('Optimized handler All-In batch: approved stats, restrictions and 4× flat chance apply independently to every subroll.');
 
 forceLoss=true;

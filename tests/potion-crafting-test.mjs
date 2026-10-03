@@ -9,7 +9,7 @@ import {
 } from "../src/logic/crafting.js";
 
 const potionRecipes = recipes.filter((recipe) => recipe.category === "potion");
-assert.equal(potionRecipes.length, 14);
+assert.equal(potionRecipes.length, 16);
 assert.ok(potionRecipes.every((recipe) => recipe.reward.type === "consumable"));
 
 const admin = readFileSync(new URL("../supabase/functions/admin/index.ts", import.meta.url), "utf8");
@@ -86,5 +86,16 @@ assert.equal(
 // Consumables are not depositable, and ownership is untouched.
 assert.equal(manuallyDepositRequirement(luckyState, lucky, luckyInventory, 0), false);
 assert.equal(luckyInventory.consumables[0].quantity, 2);
+
+const moneyUpOne = recipes.find((recipe) => recipe.id === "money-up-potion");
+const moneyUpTwo = recipes.find((recipe) => recipe.id === "money-up-potion-2");
+assert.equal(moneyUpOne.moneyCost, 25000);
+assert.equal(moneyUpOne.reward.effectValue, 1.1);
+assert.equal(moneyUpTwo.moneyCost, 100000);
+assert.equal(moneyUpTwo.reward.effectValue, 1.25);
+assert.deepEqual(
+  moneyUpTwo.requirements.find((requirement) => requirement.consumableId === "money-up-potion"),
+  { type: "consumable", consumableId: "money-up-potion", amount: 3 }
+);
 
 console.log("Potion crafting tests passed.");

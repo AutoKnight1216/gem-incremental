@@ -3,17 +3,18 @@ import { gemTimeAvailable, mythicPotionExclusiveGem } from "./availabilityRules.
 // QOL_RULES_START
 export function gemFilterDecision(settings, specimen, discovered) {
  const name = specimen.gem_name;
+ const protectedFromAutomaticConsumption = specimen.automatic_consumption_protected === true;
  const raw = Number(specimen.rarity);
  const threshold = (v, fallback) => Number.isFinite(Number(v)) && Number(v) >= 1 ? Number(v) : fallback;
  const rule = settings.gemFilter?.[name];
  const relic = name === 'Enchant Relic' || name === 'Ancient Relic';
  const discovery = !discovered.has(name) && settings.discoveryKeep !== false && raw >= threshold(settings.discoveryKeepRarity, 10000);
  const autoKeep = settings.autoKeep !== false && Number(specimen.effectiveRarity) >= threshold(settings.autoKeepEffectiveRarity, 1000000);
- const keep = relic || discovery || autoKeep || rule === 'KEEP';
+ const keep = protectedFromAutomaticConsumption || relic || discovery || autoKeep || rule === 'KEEP';
  const legacyLimit = {common:10,uncommon:50,rare:100,epic:1000,legendary:10000,mythic:100000};
  const legacy = (settings.legacyAutoSell ?? settings.autoSell) === true && raw <= (legacyLimit[settings.legacyAutoSellTier ?? settings.autoSellTier] ?? 10);
  return { keep, sell: !keep && (rule === 'SELL' || (rule == null && legacy)),
-  reason: relic ? 'relic' : discovery ? 'discovery' : autoKeep ? 'auto-keep' : rule === 'KEEP' ? 'filter-keep' : 'default' };
+  reason: protectedFromAutomaticConsumption ? 'automatic-consumption-protection' : relic ? 'relic' : discovery ? 'discovery' : autoKeep ? 'auto-keep' : rule === 'KEEP' ? 'filter-keep' : 'default' };
 }
 // QOL_RULES_END
 
@@ -27,6 +28,7 @@ export const PICKAXE_STATS = {
  'neptune':[30,.7,1.5,1.2,1.2],
  'reality-shifter':[40,.4,0,.8,.8], 'bedrock-pickaxe':[25,3,1,5,1.55],
  'supersizer-pickaxe':[19.91,2.75,.5,5.5,2.4],
+ 'paradox-pickaxe':[34,3.1,1.5,5.5,1.7],
  'impossible-pickaxe':[1,1,1,1,1],
  'fortune-pickaxe':[35,2.8,1,4.25,1.45], 'all-in-pickaxe':[500,.33,.15,.15,.15],
  'all-rounder-toy':[2,2,2,2,2], 'jackpot-slot':[7.77,1.77,.77,1.77,.77], 'money-pickaxe':[.01,.3,2,10,200],
@@ -48,7 +50,7 @@ const TOY_BORROWED_STATS = {
  'bedrock-pickaxe':[25,3.1,1.05,5,1.55]
 };
 export const ASCENDED_VALUE = 2;
-export const SERIOUS_PICKAXES = ['bedrock-pickaxe','celestial-pickaxe','empyrean-pickaxe','eternity-pickaxe','tectonic-pickaxe','the-accelerator','the-resonator','the-excavator','fortune-pickaxe','supersizer-pickaxe','all-in-pickaxe'];
+export const SERIOUS_PICKAXES = ['bedrock-pickaxe','celestial-pickaxe','paradox-pickaxe','empyrean-pickaxe','eternity-pickaxe','tectonic-pickaxe','the-accelerator','the-resonator','the-excavator','fortune-pickaxe','supersizer-pickaxe','all-in-pickaxe'];
 export const SUPERSIZER_SIZE_MUTATIONS = [
  {id:'supersizer-small',name:'Small',chance:1/3,multiplier:.75,weightMultiplier:.75,sizeMutation:true},
  {id:'supersizer-big',name:'Big',chance:1/10,multiplier:1.25,weightMultiplier:1.25,sizeMutation:true},
@@ -64,6 +66,36 @@ export const EXCAVATION_LOOT = [
  [24,28,25,13,7,2,1], [19,26,28,16,8,2,1], [14,24,30,19,9,2,2]
 ];
 export const relicSecondary = (total, active) => 1 + (total - 1) * (active ? 1.5 : 1);
+export const PARADOX_CONTRADICTION_GAINS = [0,1,3,10,40,250];
+export function paradoxConditionCount({rarity=0,naturalWeight=0,naturalMutationCount=0,value=0,effectiveRarity=0}={}) {
+ return [Number(rarity)>=1e6,Number(naturalWeight)>=3,Number(naturalMutationCount)>=1,Number(value)>=25e6,Number(effectiveRarity)>=1e9].filter(Boolean).length;
+}
+function normalizedParadoxState(saved={}) {
+ const paradox=saved.paradox&&typeof saved.paradox==='object'?structuredClone(saved.paradox):{};
+ paradox.contradiction=Math.max(0,Math.trunc(Number(paradox.contradiction??0))||0);
+ paradox.mode=['normal','critical','resolved'].includes(paradox.mode)?paradox.mode:'normal';
+ paradox.criticalRoll=Math.min(10,Math.max(1,Math.trunc(Number(paradox.criticalRoll??1))||1));
+ if(paradox.mode==='normal'&&paradox.contradiction>=1000){paradox.contradiction-=1000;paradox.mode='critical';paradox.criticalRoll=1;}
+ return paradox;
+}
+function finishParadoxSequence(paradox) {
+ if(paradox.contradiction>=1000){paradox.contradiction-=1000;paradox.mode='critical';paradox.criticalRoll=1;}
+ else {paradox.mode='normal';paradox.criticalRoll=1;}
+}
+export function paradoxPassiveMultiplier(state={}) {
+ const paradox=normalizedParadoxState(state);
+ return paradox.mode==='resolved'?3:paradox.mode==='critical'?1+paradox.criticalRoll/10:1;
+}
+export function advanceParadoxTrial(state,rarity) {
+ const trial=state.paradoxTrial;
+ if(!trial?.active||trial.completed)return;
+ trial.rolls=Math.min(10000,Math.max(0,Number(trial.rolls??0))+1);
+ trial.checkpoints={legendary:false,mythic:false,exotic:false,exalted:false,cosmic:false,...trial.checkpoints};
+ const thresholds=[['cosmic',1e7],['exalted',1e6],['exotic',1e5],['mythic',1e4],['legendary',1e3]];
+ const checkpoint=thresholds.find(([key,minimum])=>!trial.checkpoints[key]&&Number(rarity)>=minimum);
+ if(checkpoint)trial.checkpoints[checkpoint[0]]=true;
+ trial.completed=trial.rolls>=10000&&thresholds.every(([key])=>trial.checkpoints[key]);
+}
 export function luckLayers({pickaxe=1,clover=1,enchant=1,guild=1,research=1,focused=1,flat=0,special=1,oneRoll=0,world=1}) {
  const base=pickaxe*clover;
  const personal=1+(enchant-1)+(guild-1)+(research-1)+(focused-1);
@@ -88,6 +120,12 @@ export function prepareEquipmentRoll(id,saved={},random=Math.random,genuine=true
   supersizerBlessedRoll:blessingActive&&(blessedRolls+1)%10===0&&random()<1/20,
   impossible:genuine&&id==='impossible-pickaxe'&&random()<1/1000000};
  if(flags.foundationBurst) {stats[0]*=1.5;stats[3]*=1.25;stats[4]*=1.1;}
+ if(id==='paradox-pickaxe'&&genuine) {
+  const paradox=normalizedParadoxState(state);state.paradox=paradox;
+  const multiplier=paradoxPassiveMultiplier(state);
+  flags.paradox={mode:paradox.mode,criticalRoll:paradox.mode==='critical'?paradox.criticalRoll:null,multiplier,contradiction:paradox.contradiction};
+  stats[0]*=multiplier;stats[2]*=multiplier;stats[3]*=multiplier;stats[4]*=multiplier;
+ }
  if(id==='the-accelerator') stats[1]=acceleratorSpeed(Number(state.spool??0));
  if(id==='toy-shovel'&&random()<1/67) {
   flags.wrongTool=true;
@@ -123,10 +161,29 @@ export function exclusiveMutations(id,random=Math.random,genuine=true,flags={}) 
  if(id!=='silly-fun-happy-pickaxe') return [];
  return [[.5,'silly-small','Silly',.5],[.1,'silly-large','Silly',10],[.005,'happy','Happy',50]].flatMap(([chance,id,name,multiplier])=>random()<chance?[{id,name,chance,multiplier}]:[]);
 }
-export function finishEquipmentRoll(context,{naturalWeight,gem,sizeMutation=null,now=Date.now(),random=Math.random,genuine=true}) {
+export function finishEquipmentRoll(context,{naturalWeight,gem,sizeMutation=null,naturalMutationCount=0,value=0,effectiveRarity=0,now=Date.now(),random=Math.random,genuine=true}) {
  const {id,flags}=context;const state=structuredClone(context.state);
  if(!genuine) return {state,loot:null,breakneck:false};
  state.rolls={...state.rolls,[id]:Number(state.rolls?.[id]??0)+1};
+ if(id==='celestial-pickaxe') advanceParadoxTrial(state,gem?.rarity);
+ if(id==='paradox-pickaxe') {
+  const paradox=normalizedParadoxState(state);
+  const conditions=paradoxConditionCount({rarity:gem?.rarity,naturalWeight,naturalMutationCount,value,effectiveRarity});
+  paradox.lastConditions=conditions;
+  if(context.flags.paradox?.mode==='critical') {
+   const criticalRoll=Number(context.flags.paradox.criticalRoll??1);
+   if(criticalRoll>=10) {
+    if(conditions===5){paradox.mode='resolved';paradox.criticalRoll=1;}
+    else finishParadoxSequence(paradox);
+   } else {paradox.mode='critical';paradox.criticalRoll=criticalRoll+1;}
+  } else if(context.flags.paradox?.mode==='resolved') finishParadoxSequence(paradox);
+  else {
+   paradox.contradiction+=PARADOX_CONTRADICTION_GAINS[conditions]??0;
+   if(paradox.contradiction>=1000){paradox.contradiction-=1000;paradox.mode='critical';paradox.criticalRoll=1;}
+   else paradox.mode='normal';
+  }
+  state.paradox=paradox;
+ }
  if(id==='supersizer-pickaxe') {
   if(flags.supersizerBlessing) state.supersizerBlessedRolls=Math.max(0,Number(state.supersizerBlessedRolls??0))+1;
   else state.supersizerBlessedRolls=0;
@@ -1437,6 +1494,7 @@ type BatchExecution = {
   firstGenuineRoll?: number;
   nextRollAt?: string;
   cooldownMs?: number;
+  leaseReleased?: boolean;
   activeAdminEvent?: any | null;
   globalEventData?: any | null;
   guildSnapshot?: { membership: any | null; shopBuffIds: string[] };
@@ -1587,7 +1645,7 @@ async function executeSingleRoll(
       let rollContextError: any = null;
       let preclaimedMythicSurge: any = null;
       if (batchIndex === 0) {
-        const result = await ctx.supabaseAdmin.rpc("roll_prepare_context", {
+        const result = await ctx.supabaseAdmin.rpc("roll_prepare_context_v2", {
           p_player_id: playerId,
           p_now: now.toISOString(),
           p_gem_catalog_version: gemCatalogCache?.version ?? null,
@@ -1597,11 +1655,12 @@ async function executeSingleRoll(
         rollContextError = result.error;
         if (rollContext) batchExecution.initialRollContext = structuredClone(rollContext);
       } else {
-        const result = await ctx.supabaseAdmin.rpc("roll_begin_batch_subroll", {
+        const result = await ctx.supabaseAdmin.rpc("roll_begin_batch_subroll_v2", {
           p_player_id: playerId,
           p_lease_id: batchExecution.leaseId,
           p_genuine_roll: Number(batchExecution.firstGenuineRoll) + batchIndex,
-          p_now: now.toISOString()
+          p_now: now.toISOString(),
+          p_refresh_deep_sea: batchExecution.pool === "deep_sea"
         });
         rollContextError = result.error;
         if (result.data?.context) {
@@ -1610,6 +1669,9 @@ async function executeSingleRoll(
             ...result.data.context
           };
           preclaimedMythicSurge = result.data.mythicSurge ?? null;
+          if (batchExecution.pool === "deep_sea") {
+            batchExecution.deepSeaContext = result.data.deepSeaContext ?? null;
+          }
         }
       }
       recordRollPhase(batchExecution, batchIndex, "roll_prepare_context_ms", prepareContextStartedAt);
@@ -1619,18 +1681,15 @@ async function executeSingleRoll(
         return jsonResponse({ error: "roll_context_unavailable" }, { status: 503 });
       }
 
-      if (batchExecution.deepcoreContext === undefined) {
-        const { data: deepcoreContext, error: deepcoreContextError } = await ctx.supabaseAdmin.rpc(
-          "deepcore_get_roll_context",
-          { p_player_id: playerId }
-        );
-        if (deepcoreContextError) {
-          // The event migration may not have been deployed yet. Ordinary
-          // rolling must remain available during a staged rollout.
-          console.warn("Deepcore roll context unavailable:", deepcoreContextError.message);
-          batchExecution.deepcoreContext = null;
-        } else {
-          batchExecution.deepcoreContext = deepcoreContext ?? null;
+      if (batchIndex === 0) {
+        batchExecution.deepcoreContext = rollContext.deepcoreContext ?? null;
+        batchExecution.deepSeaContext = rollContext.deepSeaContext ?? null;
+        batchExecution.pets = Array.isArray(rollContext.pets) ? rollContext.pets : [];
+        batchExecution.equipmentBonusRows = Array.isArray(rollContext.equipmentBonusRows)
+          ? rollContext.equipmentBonusRows
+          : [];
+        for (const warning of rollContext.contextWarnings ?? []) {
+          console.warn(`${warning?.context ?? "Roll"} context unavailable:`, warning?.message ?? "unknown");
         }
       }
       const deepcoreContext = batchExecution.deepcoreContext;
@@ -1640,15 +1699,7 @@ async function executeSingleRoll(
       const deepcoreTimedActive = (id: string) =>
         Date.parse(String(deepcoreEffects?.[id]?.expiresAt ?? "")) > now.getTime();
 
-      let deepSeaContext = batchExecution.deepSeaContext;
-      if (batchExecution.pool === "deep_sea" || deepSeaContext === undefined) {
-        const { data, error } = await ctx.supabaseAdmin.rpc("deep_sea_get_roll_context", { p_player_id: playerId });
-        if (error) {
-          if (batchExecution.pool === "deep_sea") return jsonResponse({ error:"deep_sea_unavailable", message:error.message }, { status:503 });
-          deepSeaContext = null;
-        } else deepSeaContext = data;
-        if (batchExecution.pool !== "deep_sea") batchExecution.deepSeaContext = deepSeaContext;
-      }
+      const deepSeaContext = batchExecution.deepSeaContext;
       if (batchExecution.pool === "deep_sea" && deepSeaContext?.phase !== "active") {
         return jsonResponse({ error:"deep_sea_event_ended", phase:deepSeaContext?.phase ?? "unavailable" }, { status:409 });
       }
@@ -1657,21 +1708,8 @@ async function executeSingleRoll(
       // Load pet definitions and the two new equipment stat columns once per
       // displayed batch. Pet definitions are server-controlled; no client
       // payload can change pet odds.
-      if (batchExecution.pets === undefined) {
-        const { data: pets } = await ctx.supabaseAdmin
-          .from("game_pets")
-          .select("id,name,chance_denominator,affected_by_luck,enabled,stats")
-          .eq("enabled", true);
-        batchExecution.pets = Array.isArray(pets) ? pets : [];
-      }
-      if (batchExecution.equipmentBonusRows === undefined) {
-        const { data: equipmentBonusRows } = await ctx.supabaseAdmin
-          .from("player_equipment")
-          .select("id,equipment_id,roll_bulk_bonus,pet_luck_bonus")
-          .eq("player_id", playerId)
-          .eq("equipped", true);
-        batchExecution.equipmentBonusRows = Array.isArray(equipmentBonusRows) ? equipmentBonusRows : [];
-      }
+      // Pet definitions and the two equipment bonus columns are included in
+      // roll_prepare_context_v2 and remain stable for this leased batch.
 
       // =====================================================
       // LOAD PLAYER
@@ -1994,7 +2032,7 @@ async function executeSingleRoll(
         weightLuck *= 2;
         weightMultiplier *= 1.15;
       }
-      const maxBatchFromStats = Math.min(100, 4 + Math.max(0, Math.floor(rollBulk)));
+      const maxBatchFromStats = Math.min(100, 5 + Math.max(0, Math.floor(rollBulk)));
       if (batchExecution.batchSize > maxBatchFromStats) {
         return jsonResponse({ error: "invalid_batch_size", maximumBatchSize: maxBatchFromStats }, { status: 400 });
       }
@@ -2891,9 +2929,10 @@ async function executeSingleRoll(
       if (eternityRoll) mutationChanceMultiplier += 50;
       if(equipmentContext.id==='reality-shifter') mutationChanceMultiplier=0;
       mutationChanceMultiplier *= impossibleProc.mutationChance;
+      const naturalMutations = relicDrop ? [] : rollGemMutations(mutationChanceMultiplier, eventContext);
       const mutations = relicDrop
         ? []
-        : [...rollGemMutations(mutationChanceMultiplier, eventContext), ...exclusiveMutations(equipmentContext.id, random01, true, equipmentContext.flags), ...(supersizerSize ? [supersizerSize] : [])];
+        : [...naturalMutations, ...exclusiveMutations(equipmentContext.id, random01, true, equipmentContext.flags), ...(supersizerSize ? [supersizerSize] : [])];
 
       const mutationValueMultiplier = capCombinedMutationValueMultiplier(mutations);
       const rawMutationMultiplier = mutationValueMultiplier.rawMultiplier;
@@ -3027,7 +3066,19 @@ async function executeSingleRoll(
         mutation_multipliers:
           mutationMultipliers,
 
-        value
+        natural_mutation_ids:
+          naturalMutations.map((mutation) => mutation.id),
+
+        effective_rarity:
+          effectiveRarity,
+
+        genuine_roll:
+          true,
+
+        value,
+
+        automatic_consumption_protected:
+          gem.metadata?.automaticConsumptionProtected === true
       };
       recordRollPhase(batchExecution, batchIndex, "rng_js_ms", rngJsStartedAt);
 
@@ -3071,7 +3122,12 @@ async function executeSingleRoll(
         catch (error: any) { return jsonResponse({ error:error.deepSeaCode ?? "deep_sea_commit_failed" }, { status:409 }); }
       }
       let deepcoreAutoContribution: any = null;
-      if (batchExecution.pool === "normal" && deepcoreContext?.status === "active" && deepcoreContext?.autoContribute === true) {
+      if (
+        batchExecution.pool === "normal" &&
+        gem.metadata?.automaticConsumptionProtected !== true &&
+        deepcoreContext?.status === "active" &&
+        deepcoreContext?.autoContribute === true
+      ) {
         const { data: contribution, error: contributionError } = await ctx.supabaseAdmin.rpc(
           "deepcore_auto_contribute_roll",
           { p_player_id: playerId, p_specimen: specimen }
@@ -3082,207 +3138,84 @@ async function executeSingleRoll(
       const deepcoreDeposited = deepcoreAutoContribution?.contributed === true;
       const deepSeaDeposited = deepSeaCommit?.fed === "neptune" || deepSeaCommit?.fed === "depths";
       const bundleRouteStartedAt = timingNow(batchExecution);
-      const bundleRoutePromise = deepcoreDeposited || deepSeaDeposited
-        ? Promise.resolve({ data: { status: deepSeaDeposited ? "deep-sea" : "deepcore", keepInInventory: false }, error: null })
-        : filterDecision.keep
+      const externalDeposit = deepSeaDeposited ? "deep-sea" : deepcoreDeposited ? "deepcore" : null;
+      const routedRequest = externalDeposit
         ? Promise.resolve({
-          data: { status: "kept", keepInInventory: true, reason: filterDecision.reason },
+          data: {
+            bundle: { status: externalDeposit, keepInInventory: false },
+            autoCraft: { deposited: false, preserved: false }
+          },
           error: null
         })
-        : ctx.supabaseAdmin.rpc("bundle_route_roll", {
+        : filterDecision.keep
+        ? Promise.resolve({
+          data: {
+            bundle: { status: "kept", keepInInventory: true, reason: filterDecision.reason },
+            autoCraft: { deposited: false, preserved: false }
+          },
+          error: null
+        })
+        : ctx.supabaseAdmin.rpc("roll_route_result", {
           p_player_id: playerId,
           p_lease_id: rollLeaseId,
-          p_specimen: specimen
-        }).then((result: any) => result);
-
-      let autoConserved = false;
-      let autoDeposited = false;
-      let autoCraftRecipeId = null;
-      let autoCraftRequirementIndex = null;
-
-      const { data: bundleRoute, error: bundleRouteError } = await bundleRoutePromise;
+          p_specimen: specimen,
+          p_filter_keep: false,
+          p_active_auto_craft: rollContext.activeAutoCraft ?? null,
+          p_external_deposit: null
+        });
+      const { data: routedResult, error: bundleRouteError } = await routedRequest;
       recordRollPhase(batchExecution, batchIndex, "bundle_route_roll_ms", bundleRouteStartedAt);
-      if (timingFlags) timingFlags.bundle_route_roll_used = !filterDecision.keep;
-      if (bundleRouteError || !bundleRoute) {
+      recordRollPhase(batchExecution, batchIndex, "roll_route_result_ms", bundleRouteStartedAt);
+      if (timingFlags) timingFlags.bundle_route_roll_used = !filterDecision.keep && externalDeposit == null;
+      if (bundleRouteError || !routedResult?.bundle) {
         // An uncertain commit must never fall back to saving a second copy.
         console.error("Bundle routing failed:", bundleRouteError);
         return jsonResponse({ error: "bundle_routing_failed" }, { status: 503 });
       }
+      const bundleRoute = routedResult.bundle;
+      const autoCraftResult = routedResult.autoCraft ?? {};
+      if (routedResult.autoCraftError) {
+        console.error("Auto Craft deposit failed:", routedResult.autoCraftError);
+      }
       const bundleDeposited = bundleRoute.status === "deposited" || deepcoreDeposited || deepSeaDeposited;
       const bundleKeepInInventory = bundleRoute.keepInInventory === true;
-
-      if (rollContext.activeAutoCraft && !bundleDeposited && !bundleKeepInInventory) {
-        const autoCraftStartedAt = timingNow(batchExecution);
-        const { data: autoCraftResult, error: autoCraftError } =
-          await ctx.supabaseAdmin.rpc("roll_autocraft_deposit", {
-            p_player_id: playerId,
-            p_specimen: specimen
-          });
-        recordRollPhase(batchExecution, batchIndex, "roll_autocraft_deposit_ms", autoCraftStartedAt);
-        if (timingFlags) timingFlags.roll_autocraft_deposit_used = true;
-
-        if (autoCraftError) {
-          console.error("Auto Craft deposit failed:", autoCraftError);
-        } else if (autoCraftResult?.deposited) {
-          autoDeposited = true;
-          autoConserved = autoCraftResult.preserved === true;
-          autoCraftRecipeId = autoCraftResult.recipeId ?? null;
-          autoCraftRequirementIndex = autoCraftResult.requirementIndex ?? null;
-        }
-      }
+      const autoDeposited = autoCraftResult?.deposited === true;
+      const autoConserved = autoCraftResult?.preserved === true;
+      const autoCraftRecipeId = autoCraftResult?.recipeId ?? null;
+      const autoCraftRequirementIndex = autoCraftResult?.requirementIndex ?? null;
+      if (autoDeposited) recordRollPhase(batchExecution, batchIndex, "roll_autocraft_deposit_ms", bundleRouteStartedAt);
+      if (timingFlags) timingFlags.roll_autocraft_deposit_used = autoDeposited;
 
       if (batchExecution.pool === "deep_sea" && !deepSeaCommit) {
         const inventoryRequired = !bundleDeposited && (!autoDeposited || autoConserved) && !relicDrop;
         try { await commitDeepSea(inventoryRequired); }
         catch (error: any) { return jsonResponse({ error:error.deepSeaCode ?? "deep_sea_commit_failed" }, { status:409 }); }
       }
-      // =====================================================
-      // SAVE TO INVENTORY IF NOT AUTO-DEPOSITED
-      // =====================================================
-
-      let savedGem =
-        null;
-
-      let veinHunterDuplicate = null;
-
-
-      if (
-        !bundleDeposited && (!autoDeposited || autoConserved)
-      ) {
-        const inventoryInsertStartedAt = timingNow(batchExecution);
-        if (relicDrop) {
-          const { error: grantRelicError } = await ctx.supabaseAdmin.rpc(
-            "grant_player_relic",
-            {
-              p_player_id: playerId,
-              p_relic_type: gem.name,
-              p_amount: 1
-            }
-          );
-
-          if (grantRelicError) {
-            console.error("Failed to save rolled relic:", grantRelicError);
-            return jsonResponse(
-              { error: "Failed to save rolled relic." },
-              { status: 500 }
-            );
-          }
-        } else {
-          const {
-            data:
-              insertedGem,
-            error:
-              saveGemError
-          } =
-            await ctx
-              .supabaseAdmin
-              .from(
-                "inventory_gems"
-              )
-              .insert({
-              player_id:
-                playerId,
-
-              gem_name:
-                gem.name,
-
-              rarity:
-                gem.rarity,
-
-              base_weight:
-                gem.baseWeight,
-
-              value_per_gram:
-                gem.valuePerGram,
-
-              rolled_weight_multiplier:
-                rolledWeightMultiplier,
-
-              rolled_weight:
-                rolledWeight,
-
-              final_weight:
-                finalWeight,
-
-              mutation_id:
-                primaryMutation?.id ?? null,
-
-              mutation_multiplier:
-                mutationMultiplier,
-
-              mutation_ids:
-                mutationIds,
-
-              mutation_multipliers:
-                mutationMultipliers,
-
-              mutation_chance_multiplier:
-                mutationChanceMultiplier,
-
-              value,
-
-              locked:
-                false,
-
-              roll_number:
-                Number(
-                  player.total_rolls ??
-                  0
-                ) +
-                1,
-
-              luck_at_roll:
-                luck,
-
-              source_event_occurrence_id:
-                eventContext.occurrenceId,
-
-              source_event_key:
-                eventContext.eventKey,
-
-              event_properties: {
-                bagged,
-                state: eventContext.state,
-                luckyRoll: eventContext.luckyRoll,
-                secondChance: eventContext.secondChance,
-                starfallActive: eventContext.starfallActive
-              },
-
-              value_multiplier_at_roll:
-                eventContext.valueMultiplier
-              })
-              .select()
-              .single();
-
-
-          if (
-            saveGemError ||
-            !insertedGem
-          ) {
-            console.error(
-              "Failed to save rolled gem:",
-              saveGemError
-            );
-
-
-            return jsonResponse(
-              {
-                error:
-                  "Failed to save rolled gem."
-              },
-              {
-                status: 500
-              }
-            );
-          }
-
-
-          savedGem =
-            insertedGem;
-        }
-        recordRollPhase(batchExecution, batchIndex, "inventory_insert_ms", inventoryInsertStartedAt);
-        if (timingFlags) timingFlags.inventory_insert_used = true;
-      }
+      // Persistence is deferred until the JS-only duplicate/equipment RNG has
+      // finished, then committed atomically with equipment and bookkeeping.
+      const shouldSavePrimary = !bundleDeposited && (!autoDeposited || autoConserved);
+      const inventorySpecimen = {
+        ...specimen,
+        value_per_gram: gem.valuePerGram,
+        rolled_weight: rolledWeight,
+        mutation_chance_multiplier: mutationChanceMultiplier,
+        locked: false,
+        roll_number: Number(player.total_rolls ?? 0) + 1,
+        luck_at_roll: luck,
+        source_event_occurrence_id: eventContext.occurrenceId,
+        source_event_key: eventContext.eventKey,
+        event_properties: {
+          bagged,
+          state: eventContext.state,
+          luckyRoll: eventContext.luckyRoll,
+          secondChance: eventContext.secondChance,
+          starfallActive: eventContext.starfallActive
+        },
+        value_multiplier_at_roll: eventContext.valueMultiplier
+      };
+      let savedGem: any = null;
+      let veinHunterDuplicate: any = null;
+      let veinHunterDuplicatePayload: any = null;
 
       // Vein Hunter creates a true second specimen: only the base gem is
       // copied. Weight and every mutation are rolled again independently.
@@ -3341,11 +3274,7 @@ async function executeSingleRoll(
             researchNumber("gem_value_multiplier") * duplicateResearchMutationValue *
           (mineArtifacts.has("bedrock-crown") ? 1.05 : 1) * eventContext.valueMultiplier;
 
-        const duplicateInventoryInsertStartedAt = timingNow(batchExecution);
-        const { data: duplicateGem, error: duplicateError } = await ctx.supabaseAdmin
-          .from("inventory_gems")
-          .insert({
-            player_id: playerId,
+        veinHunterDuplicatePayload = {
             gem_name: gem.name,
             rarity: gem.rarity,
             base_weight: gem.baseWeight,
@@ -3366,17 +3295,7 @@ async function executeSingleRoll(
             ,source_event_key: eventContext.eventKey
             ,event_properties: { state: eventContext.state, duplicate: true }
             ,value_multiplier_at_roll: eventContext.valueMultiplier
-          })
-          .select()
-          .single();
-        recordRollPhase(batchExecution, batchIndex, "inventory_insert_ms", duplicateInventoryInsertStartedAt);
-        if (timingFlags) timingFlags.inventory_insert_used = true;
-
-        if (duplicateError) {
-          console.error("Vein Hunter duplicate insert failed:", duplicateError);
-        } else {
-          veinHunterDuplicate = duplicateGem;
-        }
+          };
       }
 
       if (hasRarityResonance && luckBasedGem) {
@@ -3395,21 +3314,23 @@ async function executeSingleRoll(
         progressionStateUpdate.best_rare_natural_weight_100k = Math.max(
           Number(player.best_rare_natural_weight_100k ?? 0),
           rolledWeightMultiplier,
-          Number(veinHunterDuplicate?.rolled_weight_multiplier ?? 0)
+          Number(veinHunterDuplicatePayload?.rolled_weight_multiplier ?? 0)
         );
       }
       if (!relicDrop && gem.rarity >= 1000000) {
         progressionStateUpdate.best_rare_natural_weight_1m = Math.max(
           Number(player.best_rare_natural_weight_1m ?? 0),
           rolledWeightMultiplier,
-          Number(veinHunterDuplicate?.rolled_weight_multiplier ?? 0)
+          Number(veinHunterDuplicatePayload?.rolled_weight_multiplier ?? 0)
         );
       }
       Object.assign(playerPatch, progressionStateUpdate);
 
       const equipmentOutcome = finishEquipmentRoll(equipmentContext, {
         naturalWeight: relicDrop ? null : rolledWeightMultiplier, gem: relicDrop ? null : gem,
-        sizeMutation: supersizerSize, now: now.getTime(), random: random01
+        sizeMutation: supersizerSize, naturalMutationCount: naturalMutations.length,
+        value: relicDrop ? 0 : value, effectiveRarity: relicDrop ? 0 : effectiveRarity,
+        now: now.getTime(), random: random01
       });
       const history={...(equipmentOutcome.state.batchHistory??{})};
       if(!relicDrop) {
@@ -3530,20 +3451,49 @@ async function executeSingleRoll(
       };
 
       const equipmentCommitStartedAt = timingNow(batchExecution);
-      const { data: equipmentCommit, error: equipmentCommitError } = await ctx.supabaseAdmin.rpc('commit_equipment_roll', {
+      const autoSellRequested = filterDecision.sell && shouldSavePrimary && !relicDrop &&
+        !bundleKeepInInventory && !autoDeposited && !autoConserved;
+      const { data: committedResult, error: equipmentCommitError } = await ctx.supabaseAdmin.rpc('roll_commit_result', {
         p_player_id: playerId, p_lease_id: rollLeaseId, p_genuine_roll: genuineRoll,
+        p_primary_specimen: inventorySpecimen,
+        p_save_primary: shouldSavePrimary,
+        p_relic_drop: relicDrop,
+        p_duplicate: veinHunterDuplicatePayload,
+        p_auto_sell: autoSellRequested,
         p_state: equipmentOutcome.state, p_loot: equipmentOutcome.loot, p_bonus: breakneckGem,
         p_capacity: effectiveInventoryCapacity, p_player_patch: playerPatch,
         p_bookkeeping: bookkeepingPayload,
-        p_include_background: batchExecution.batchSize > 1
+        p_include_background: batchExecution.batchSize > 1,
+        p_release_on_success: batchIndex === batchExecution.batchSize - 1
       });
+      const equipmentCommit = committedResult?.equipment ?? {};
+      savedGem = committedResult?.primary ?? null;
+      veinHunterDuplicate = committedResult?.duplicate ?? null;
       recordRollPhase(batchExecution, batchIndex, "commit_equipment_roll_ms", equipmentCommitStartedAt);
+      recordRollPhase(batchExecution, batchIndex, "roll_commit_result_ms", equipmentCommitStartedAt);
+      if (shouldSavePrimary || veinHunterDuplicatePayload) {
+        recordRollPhase(batchExecution, batchIndex, "inventory_insert_ms", equipmentCommitStartedAt);
+        if (timingFlags) timingFlags.inventory_insert_used = true;
+      }
       recordRollPhase(batchExecution, batchIndex, "roll_finish_bookkeeping_critical_ms", equipmentCommitStartedAt);
       if (batchExecution.batchSize > 1) {
         recordRollPhase(batchExecution, batchIndex, "roll_finish_bookkeeping_background_ms", equipmentCommitStartedAt);
       }
       if (equipmentCommitError) throw equipmentCommitError;
+      if (committedResult?.leaseReleased === true) batchExecution.leaseReleased = true;
+      if (committedResult?.duplicateError) {
+        console.error("Vein Hunter duplicate insert failed:", committedResult.duplicateError);
+      }
       breakneckGem = equipmentCommit?.bonus ?? null;
+
+      let paradoxCrafted = false;
+      if (equipmentContext.id === 'celestial-pickaxe' && equipmentOutcome.state.paradoxTrial?.completed === true && batchIndex === batchExecution.batchSize - 1) {
+        const { data: paradoxCompletion, error: paradoxCompletionError } = await ctx.supabaseAdmin.rpc('complete_paradox_trial', {
+          p_player_id: playerId
+        });
+        if (paradoxCompletionError) console.error('Paradox trial completion failed:', paradoxCompletionError);
+        else paradoxCrafted = paradoxCompletion?.crafted === true || paradoxCompletion?.alreadyOwned === true;
+      }
 
       let petReward: any = null;
       if (petDrop) {
@@ -3634,17 +3584,15 @@ async function executeSingleRoll(
       let inventoryCountWithDuplicate = finalInventoryCount + (veinHunterDuplicate ? 1 : 0) + (breakneckGem ? 1 : 0);
 
       let filterSale: any = null;
-      if (filterDecision.sell && savedGem && !bundleKeepInInventory && !autoDeposited && !autoConserved) {
-        const { data: money, error: saleError } = await ctx.supabaseAdmin.rpc('sell_inventory_gem', {
-          p_player_id: playerId, p_specimen_id: savedGem.id, p_source: 'auto'
-        });
+      if (autoSellRequested && savedGem) {
+        const saleReceipt = committedResult?.sale ?? {};
         const supersizerSellMultiplier = equipmentContext.id === 'supersizer-pickaxe' ? 1.25 : 1;
         const blessingSellMultiplier = equipmentContext.id === 'supersizer-pickaxe' && Date.parse(String(equipmentOutcome.state.supersizerBlessingUntil ?? '')) > Date.now() ? 1.5 : 1;
         const artifactSellMultiplier = mineArtifacts.has('foreman-seal') ? 1.03 : 1;
         const gemValueBoost = (activeBoosts ?? []).find((b: any) => b.family === 'gemValue');
         const autoSellMultiplier = gemValueBoost ? Number(gemValueBoost.effect_value ?? 1) : 1;
-        if (!saleError) { filterSale = { sold: true, soldValue: value * supersizerSellMultiplier * blessingSellMultiplier * artifactSellMultiplier * autoSellMultiplier, money }; inventoryCountWithDuplicate -= 1; }
-        else console.error('Gem Filter sale failed; specimen retained:', saleError);
+        if (saleReceipt.sold === true) { filterSale = { sold: true, soldValue: value * supersizerSellMultiplier * blessingSellMultiplier * artifactSellMultiplier * autoSellMultiplier, money: saleReceipt.money }; inventoryCountWithDuplicate -= 1; }
+        else if (saleReceipt.error) console.error('Gem Filter sale failed; specimen retained:', saleReceipt.error);
       }
 
       // =====================================================
@@ -3767,7 +3715,10 @@ async function executeSingleRoll(
             after: luckBasedGem ? (gem.rarity >= 100000 ? resonanceBeforeRoll : resonanceEmpowered ? 0 : Math.min(100, resonanceBeforeRoll + 1)) : resonanceBeforeRoll,
             empowered: resonanceEmpowered && luckBasedGem,
             consumed: resonanceEmpowered && luckBasedGem && gem.rarity < 100000
-          } : null
+          } : null,
+          paradox: equipmentOutcome.state.paradox ?? null,
+          paradoxTrial: equipmentOutcome.state.paradoxTrial ?? null,
+          paradoxCrafted
         },
 
         impossibleWorldFirst: player.equipment_state?.impossibleWorldFirst === true,
@@ -3965,7 +3916,7 @@ const authenticatedRollHandler = withSupabase(
         }
       } finally {
         const leaseReleaseStartedAt = timingNow(execution);
-        if (execution.leaseId) {
+        if (execution.leaseId && !execution.leaseReleased) {
           const { error } = await ctx.supabaseAdmin.rpc("release_server_roll", {
             p_player_id: ctx.userClaims?.id,
             p_lease_id: execution.leaseId

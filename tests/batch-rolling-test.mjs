@@ -1,9 +1,11 @@
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import {
+  BATCH_SPECIALIST_PICKAXE_IDS,
   BATCH_ROLL_OPTIONS,
   batchCooldown,
   batchRollResults,
+  countOwnedBatchSpecialistPickaxes,
   isBatchSizeUnlocked,
   normalizeUiBatchSize
 } from "../src/logic/batchRolling.js";
@@ -14,17 +16,28 @@ const edge = read("../supabase/functions/roll/index.ts");
 const migration = read("../supabase/migrations/20260913033312_batch_rolling_and_all_in_balance.sql");
 const allInMigration = read("../supabase/migrations/20260924092958_rework_all_in_pickaxe.sql");
 const counterFix = read("../supabase/migrations/20260913100304_fix_total_roll_crafting_and_batch_unlocks.sql");
+const unlockRebalance = read("../supabase/migrations/20261001100225_rebalance_batch_roll_unlocks.sql");
 const settings = read("../src/ui/settings.js");
+const settingsPage = read("../settings/settings.js");
 const main = read("../main.js");
 
-assert.deepEqual(BATCH_ROLL_OPTIONS.map((option) => option.baseCooldownSeconds), [2.5, 5, 7.5, 10]);
+assert.deepEqual(BATCH_ROLL_OPTIONS.map((option) => option.baseCooldownSeconds), [2.5, 5, 7.5, 10, 12.5]);
 assert.equal(normalizeUiBatchSize(99), 99);
 assert.equal(isBatchSizeUnlocked(1), true);
 assert.equal(isBatchSizeUnlocked(2), true);
-assert.equal(isBatchSizeUnlocked(3, { totalRolls: 99_999 }), false);
-assert.equal(isBatchSizeUnlocked(3, { totalRolls: 100_000 }), true);
-assert.equal(isBatchSizeUnlocked(4, { totalRolls: 500_000 }), false);
-assert.equal(isBatchSizeUnlocked(4, { totalRolls: 500_000, hasCelestialPickaxe: true }), true);
+assert.equal(isBatchSizeUnlocked(3, { totalRolls: 49_999 }), false);
+assert.equal(isBatchSizeUnlocked(3, { totalRolls: 50_000 }), true);
+assert.equal(isBatchSizeUnlocked(4, { totalRolls: 200_000 }), false);
+assert.equal(isBatchSizeUnlocked(4, { totalRolls: 200_000, hasCelestialPickaxe: true }), true);
+assert.equal(isBatchSizeUnlocked(5, { totalRolls: 500_000, specialistPickaxes: 2 }), false);
+assert.equal(isBatchSizeUnlocked(5, { totalRolls: 500_000, specialistPickaxes: 3 }), true);
+assert.equal(BATCH_SPECIALIST_PICKAXE_IDS.length, 10);
+assert.equal(countOwnedBatchSpecialistPickaxes([
+  { equipment_id: "fortune-pickaxe" },
+  { equipment_id: "fortune-pickaxe" },
+  { equipment_id: "tectonic-pickaxe" },
+  { equipment_id: "toy-shovel" }
+]), 2);
 assert.deepEqual(batchRollResults({ results: [{ id: 1 }, { id: 2 }] }).map((result) => result.id), [1, 2]);
 assert.equal(batchCooldown({ results: [{ cooldown: { durationMs: 5000 } }] }).durationMs, 5000);
 
@@ -34,9 +47,12 @@ assert.match(allInMigration, /roll_speed_bonus=-0\.67/);
 assert.match(allInMigration, /"rolls":100000/);
 assert.match(allInMigration, /'tryhard','Tryhard',2000,10/);
 assert.match(counterFix, /select total_rolls\s+into v_total_rolls/);
-assert.match(counterFix, /p_batch_size = 3 and v_total_rolls >= 100000/);
-assert.match(counterFix, /p_batch_size = 4 and v_total_rolls >= 500000 and v_has_celestial/);
 assert.match(counterFix, /public\.crafting_progress/);
+assert.match(unlockRebalance, /select coalesce\(total_rolls, 0\)/);
+assert.match(unlockRebalance, /p_batch_size = 3 and v_total_rolls >= 50000/);
+assert.match(unlockRebalance, /p_batch_size = 4[\s\S]*v_total_rolls >= 200000[\s\S]*v_has_celestial/);
+assert.match(unlockRebalance, /p_batch_size >= 5[\s\S]*v_total_rolls >= 500000[\s\S]*v_specialist_pickaxes >= 3/);
+assert.match(unlockRebalance, /least\(100, 5 \+ v_roll_bulk\)/);
 assert.match(migration, /equipment_id = 'celestial-pickaxe'/);
 assert.match(migration, /revoke all on function public\.claim_equipment_roll_batch/);
 
@@ -54,6 +70,8 @@ assert.match(edge, /if \(batchExecution\.batchSize > 1\) await backgroundPostCom
 assert.match(edge, /claim_equipment_roll_batch/);
 assert.match(edge, /finally \{[\s\S]*release_server_roll/);
 assert.match(settings, /batchSize: normalizeUiBatchSize/);
+assert.match(settingsPage, /totalRolls: Number\(player\?\.total_rolls \?\? 0\)/);
+assert.doesNotMatch(settingsPage, /batchAccess = \{[\s\S]{0,500}equipment_genuine_rolls/);
 assert.match(main, /invokeFunction\("roll", \{ batchSize: getSettings\(\)\.batchSize, pool: getSettings\(\)\.rollPool \}\)/);
 assert.match(main, /totalRolls: view\.totalRolls/);
 assert.match(main, /appendBatchResults\(results, outcomes\)/);
