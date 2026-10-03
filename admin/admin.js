@@ -39,6 +39,7 @@ const appealsSummary = document.getElementById("appealsSummary");
 const appealsContent = document.getElementById("appealsContent");
 const appealsFilter = document.getElementById("appealsFilter");
 const appealsRefresh = document.getElementById("appealsRefresh");
+let canWriteAdmin = false;
 
 function setFeatureLab(open) {
   if (!featureLab) return;
@@ -178,6 +179,8 @@ function renderPlayer(data) {
       </div>
       <span class="badge ${locked ? "badge--danger" : "badge--positive"}">${locked ? "Locked" : "Active"}</span>
     </div>
+
+    ${canWriteAdmin ? "" : '<p class="admin-note">Read-only access: player information is visible, but grants and account actions are disabled.</p>'}
 
     <div class="admin-grid">
       <section class="admin-section">
@@ -363,7 +366,13 @@ function renderPlayer(data) {
     </div>
   `;
 
-  wirePlayerActions();
+  if (canWriteAdmin) {
+    wirePlayerActions();
+  } else {
+    playerPanel.querySelectorAll("input, select, textarea, button[data-action]").forEach((control) => {
+      control.disabled = true;
+    });
+  }
 }
 
 function stat(label, value) {
@@ -381,6 +390,7 @@ function wirePlayerActions() {
 }
 
 async function runBanAction(button, action) {
+  if (!canWriteAdmin) return;
   if (!selectedPlayerId) return;
   let rpc, args, successMsg;
 
@@ -411,6 +421,7 @@ async function runBanAction(button, action) {
 }
 
 async function runPlayerAction(button) {
+  if (!canWriteAdmin) return;
   const action = button.dataset.action;
 
   // Timed app-level bans go through SECURITY DEFINER RPCs, not the admin
@@ -1666,83 +1677,6 @@ function wireUpdateLogPublisher() {
 
 
 // =========================================================
-// SHAREHOLDERS — read-only Exchange holdings overview (admin only)
-// =========================================================
-
-const shareholdersPanel = document.getElementById("shareholdersPanel");
-const shareholdersRefresh = document.getElementById("shareholdersRefresh");
-const shareholdersSummary = document.getElementById("shareholdersSummary");
-const shareholdersContent = document.getElementById("shareholdersContent");
-
-function plCell(pl, isPercent) {
-  const n = Number(pl ?? 0);
-  const up = n >= 0;
-  const text = isPercent
-    ? `${up ? "+" : "−"}${Math.abs(n).toFixed(1)}%`
-    : `${up ? "+" : "−"}${formatMoney(Math.abs(n))}`;
-  return `<td class="num ${up ? "is-up" : "is-down"}">${text}</td>`;
-}
-
-async function loadShareholders() {
-  if (!shareholdersPanel) return;
-  shareholdersPanel.hidden = false;
-  shareholdersContent.innerHTML = '<div class="skeleton" style="height:180px"></div>';
-
-  const { data, error } = await supabase.rpc("admin_get_shareholders");
-  if (error) {
-    shareholdersContent.innerHTML =
-      `<div class="empty"><p class="empty__title">Could not load shareholders</p><p>${escapeHtml(error.message)}</p></div>`;
-    shareholdersSummary.textContent = "Failed to load.";
-    return;
-  }
-
-  const holders = Array.isArray(data?.holders) ? data.holders : [];
-  const price = Number(data?.price ?? 0);
-  const totalPl = Number(data?.totalPl ?? 0);
-  shareholdersSummary.innerHTML =
-    `<strong>${data?.holderCount ?? holders.length}</strong> holder(s) · ` +
-    `index <strong>$${price.toFixed(2)}</strong> · ` +
-    `invested ${formatMoney(Number(data?.totalInvested ?? 0))} · ` +
-    `value ${formatMoney(Number(data?.totalValue ?? 0))} · ` +
-    `net P/L <span class="${totalPl >= 0 ? "is-up" : "is-down"}">${totalPl >= 0 ? "+" : "−"}${formatMoney(Math.abs(totalPl))}</span>`;
-
-  if (!holders.length) {
-    shareholdersContent.innerHTML = '<div class="empty"><p class="empty__title">No one is holding shares.</p></div>';
-    return;
-  }
-
-  const rows = holders.map((h) => `
-      <tr>
-        <td>${escapeHtml(h.username ?? "Unknown")}</td>
-        <td class="num">${Number(h.shares ?? 0).toLocaleString(undefined, { maximumFractionDigits: 1 })}</td>
-        <td class="num">${formatMoney(Number(h.invested ?? 0))}</td>
-        <td class="num">${formatMoney(Number(h.value ?? 0))}</td>
-        ${plCell(h.pl, false)}
-        ${plCell(h.plPct, true)}
-      </tr>`).join("");
-
-  shareholdersContent.innerHTML = `
-    <div class="shareholders-table-wrap">
-      <table class="shareholders-table">
-        <thead>
-          <tr>
-            <th>Player</th>
-            <th class="num">Shares</th>
-            <th class="num">Invested</th>
-            <th class="num">Value</th>
-            <th class="num">P/L</th>
-            <th class="num">P/L %</th>
-          </tr>
-        </thead>
-        <tbody>${rows}</tbody>
-      </table>
-    </div>`;
-}
-
-shareholdersRefresh?.addEventListener("click", loadShareholders);
-
-
-// =========================================================
 // BANK ACCOUNTS (admin only)
 // =========================================================
 
@@ -1960,6 +1894,7 @@ const ipWhitelistNote = document.getElementById("ipWhitelistNote");
 const ipWhitelistAdd = document.getElementById("ipWhitelistAdd");
 const ipWhitelistList = document.getElementById("ipWhitelistList");
 const ipWhitelistCount = document.getElementById("ipWhitelistCount");
+const ipWhitelist = document.getElementById("ipWhitelist");
 
 function ipAuditDate(value) {
   if (!value) return "—";
@@ -1973,11 +1908,11 @@ function ipAuditAccountRows(accounts) {
       ? `<span class="badge badge--danger ip-audit-banned" title="${escapeHtml(account.banUntil ? "Banned until " + ipAuditDate(account.banUntil) : "Currently banned")}">Banned</span>`
       : "";
     const ip = account.lastIp ?? "";
-    const whitelistButton = ip
+    const whitelistButton = canWriteAdmin && ip
       ? `<button class="btn btn--sm" type="button" data-ip-whitelist="${escapeHtml(ip)}" title="Never flag this IP again">Whitelist IP</button>`
       : "";
     // Already-banned accounts show the tag instead of a redundant ban button.
-    const banButton = account.banned
+    const banButton = account.banned || !canWriteAdmin
       ? ""
       : `<button class="btn btn--sm btn--danger" type="button" data-ip-ban="${escapeHtml(account.playerId)}" title="Permanently ban this account as an alt">Ban Now</button>`;
     return `
@@ -2000,6 +1935,7 @@ const ALT_ACCOUNT_BAN_REASON =
   "Alt account. If you think this is wrong, submit an appeal from this ban screen.";
 
 async function banAltAccountFromAudit(playerId, button) {
+  if (!canWriteAdmin) return;
   if (!playerId) return;
   if (!window.confirm("Permanently ban this account as an alt? They'll see a ban screen every time they open the game.")) {
     return;
@@ -2073,6 +2009,7 @@ async function loadWhitelist() {
 }
 
 async function addWhitelist(ip, note) {
+  if (!canWriteAdmin) return;
   const cleanIp = String(ip ?? "").trim();
   if (!cleanIp) {
     notify.error("IP required", "Enter an IP address to whitelist.");
@@ -2094,6 +2031,7 @@ async function addWhitelist(ip, note) {
 }
 
 async function removeWhitelist(ip) {
+  if (!canWriteAdmin) return;
   const { data, error } = await supabase.rpc("admin_remove_ip_whitelist", { p_ip: ip });
   if (error) {
     notify.error("Could not remove IP", error.message);
@@ -2112,7 +2050,11 @@ ipWhitelistInput?.addEventListener("keydown", (event) => {
 async function loadIpAudit() {
   if (!ipAuditPanel || !ipAuditContent) return;
   ipAuditPanel.hidden = false;
-  loadWhitelist();
+  if (canWriteAdmin) loadWhitelist();
+  else if (ipWhitelist) {
+    ipWhitelist.hidden = true;
+    ipWhitelist.style.display = "none";
+  }
 
   const rawMin = Math.trunc(Number(ipAuditMin?.value ?? 2));
   const minAccounts = Number.isFinite(rawMin) ? Math.min(100, Math.max(2, rawMin)) : 2;
@@ -2164,6 +2106,15 @@ async function loadIpAudit() {
   for (const button of ipAuditContent.querySelectorAll("[data-ip-ban]")) {
     button.addEventListener("click", () => banAltAccountFromAudit(button.dataset.ipBan, button));
   }
+
+  if (!canWriteAdmin) {
+    ipWhitelistInput?.setAttribute("disabled", "");
+    ipWhitelistNote?.setAttribute("disabled", "");
+    if (ipWhitelistAdd) ipWhitelistAdd.disabled = true;
+    document.querySelectorAll("[data-ip-ban], [data-ip-whitelist], [data-ip-unwhitelist]").forEach((button) => {
+      button.disabled = true;
+    });
+  }
 }
 
 ipAuditButton?.addEventListener("click", loadIpAudit);
@@ -2186,27 +2137,35 @@ if (!user || !whoami?.isAdmin) {
   status.textContent = "You do not have permission to use this page.";
   notify.error("Access denied", "Administrator access is required.");
 } else {
+  canWriteAdmin = whoami.canWrite === true;
   const { data: ownPlayer } = await supabase
     .from("players")
     .select("money")
     .eq("id", user.id)
     .maybeSingle();
   shell.setWallet(ownPlayer?.money ?? null);
-  status.textContent = "Administrator access verified.";
+  status.textContent = canWriteAdmin
+    ? "Owner administrator access verified."
+    : "Read-only administrator access verified.";
   searchButton.disabled = false;
   auditButton.disabled = false;
   if (ipAuditButton) ipAuditButton.disabled = false;
   analyticsButton.disabled = false;
-  if (featureLabButton) featureLabButton.disabled = false;
-  wireAnnouncements();
-  wireMaintenanceControls();
-  wireUpdateLogPublisher();
-  wireCodes();
-  tryWireAdminEvents();
-  await loadSectionControls();
-  await wireMutationEvents();
-  await loadMutationCatalog();
-  await loadShareholders();
+  if (featureLabButton) {
+    featureLabButton.disabled = false;
+    featureLabButton.hidden = !canWriteAdmin;
+    featureLabButton.style.display = canWriteAdmin ? "" : "none";
+  }
+  if (canWriteAdmin) {
+    wireAnnouncements();
+    wireMaintenanceControls();
+    wireUpdateLogPublisher();
+    wireCodes();
+    tryWireAdminEvents();
+    await loadSectionControls();
+    await wireMutationEvents();
+    await loadMutationCatalog();
+  }
   await loadBankAccounts();
   await loadGuildRoster();
   searchInput.focus();
@@ -2503,12 +2462,8 @@ const economyBreakdown = mountEconomy({
 
   const GROUPS = {
     search: ["#adminSearchCard", "#searchResults", "#playerPanel", "#auditPanel"],
-    economy: ["#economyPanel", "#analyticsPanel", "#shareholdersPanel", "#bankPanel"],
+    economy: ["#economyPanel", "#analyticsPanel", "#bankPanel"],
     content: ["#maintenancePanel", "#announcePanel", "#updatesPanel", "#codesPanel", "#eventsPanel", "#mutationEventsPanel", "#mutationCatalogPanel", "#sectionControlsPanel", "#customCatalogPanel", "#featureCatalogPanel"],
-    equipment: ["#equipmentAdminPanel"],
-    pets: ["#petsAdminPanel"],
-    workbench: ["#workbenchAdminPanel"],
-    "limited-events": ["#limitedEventsAdminPanel"],
     community: ["#guildRosterPanel", "#referralsPanel", "#ipAuditPanel"],
     appeals: ["#appealsPanel"],
     cli: ["#cliPanel"]
@@ -2537,16 +2492,13 @@ const economyBreakdown = mountEconomy({
       if (typeof loadIpAudit === "function") loadIpAudit();
       if (typeof loadReferrals === "function") loadReferrals();
     },
-    equipment: () => loadEquipmentAdmin(),
-    pets: () => loadPetsAdmin(),
     cli: () => mountAdminCli({ mount: document.getElementById("cliPanel") }),
-    workbench: () => loadWorkbenchAdmin(),
-    "limited-events": () => loadLimitedEventsAdmin()
   };
   const loaded = new Set();
   let active = "search";
 
   function showAdminTab(name) {
+    if (!canWriteAdmin && !["search", "economy", "community"].includes(name)) return;
     if (!pages[name]) return;
     active = name;
     for (const [tab, page] of Object.entries(pages)) page.hidden = tab !== name;
@@ -2560,6 +2512,10 @@ const economyBreakdown = mountEconomy({
   }
 
   tabBar.querySelectorAll("[data-admin-tab]").forEach((button) => {
+    if (!canWriteAdmin && !["search", "economy", "community"].includes(button.dataset.adminTab)) {
+      button.hidden = true;
+      return;
+    }
     button.addEventListener("click", () => showAdminTab(button.dataset.adminTab));
   });
 
@@ -2800,4 +2756,4 @@ document.getElementById("featureCatalogRefresh")?.addEventListener("click",loadF
 // Prime the content catalogs after authentication. Equipment and Pets are
 // loaded lazily when their tabs open so a rolling database deploy does not
 // generate missing-RPC errors on every Admin page visit.
-setTimeout(()=>{loadCustomCatalog();loadFeatureCatalog();},1000);
+if (canWriteAdmin) setTimeout(()=>{loadCustomCatalog();loadFeatureCatalog();},1000);

@@ -19,9 +19,11 @@ assert.match(html, /<section class="card admin-search" id="adminSearchCard">/);
 assert.match(js, /function initAdminTabs\(\)/);
 // Player search + player panel live in the Search tab (not Feature Lab).
 assert.match(js, /search: \["#adminSearchCard", "#searchResults", "#playerPanel", "#auditPanel"\]/);
-assert.match(js, /economy: \["#economyPanel", "#analyticsPanel", "#shareholdersPanel", "#bankPanel"\]/);
+assert.match(js, /economy: \["#economyPanel", "#analyticsPanel", "#bankPanel"\]/);
 assert.match(js, /community: \["#guildRosterPanel", "#referralsPanel", "#ipAuditPanel"\]/);
 assert.match(js, /appeals: \["#appealsPanel"\]/);
+assert.doesNotMatch(html, /data-admin-tab="(?:equipment|pets|workbench|limited-events)"/);
+assert.doesNotMatch(html, /id="shareholdersPanel"/);
 // Builds a page wrapper per tab and switches between them.
 assert.match(js, /data\.adminTabPage = name|dataset\.adminTabPage = name/);
 assert.match(js, /function showAdminTab\(name\)/);
@@ -30,8 +32,9 @@ assert.match(js, /page\.hidden = tab !== name/);
 assert.doesNotMatch(js, /adminFeatureLab["']\]/);
 // Heavy panels load only when their tab is first opened.
 assert.match(js, /const LAZY = \{[\s\S]*loadAnalytics[\s\S]*loadIpAudit/);
-assert.match(js, /equipment: \(\) => loadEquipmentAdmin\(\)/);
-assert.match(js, /pets: \(\) => loadPetsAdmin\(\)/);
+assert.match(js, /\["search", "economy", "community"\]\.includes\(name\)/);
+assert.match(js, /whoami\.canWrite === true/);
+assert.match(js, /Read-only administrator access verified/);
 assert.doesNotMatch(js, /setTimeout\(\(\)=>\{[^}]*loadEquipmentAdmin/);
 assert.match(js, /if \(!loaded\.has\(name\) && LAZY\[name\]\)/);
 // Only tabs accepted by admin_set_equipment_tab are submitted. Legacy tabs
