@@ -115,6 +115,60 @@
       <p class="account-status" id="announceStatus"></p>
     </section>
 
+    <section class="card admin-maintenance" id="maintenancePanel" hidden>
+      <div class="admin-section-head">
+        <div>
+          <h2>Game shutdown</h2>
+          <p class="page-head__sub">Schedule an update window. Players are warned before it starts and blocked while it is active.</p>
+        </div>
+        <button class="btn" id="maintenanceRefresh" type="button">Refresh</button>
+      </div>
+
+      <div class="admin-maintenance__state" id="maintenanceState" aria-live="polite">Loading shutdown status…</div>
+
+      <div class="admin-maintenance__form">
+        <label class="field">
+          <span>Starts</span>
+          <select id="maintenanceStartMode" class="select">
+            <option value="now">Now</option>
+            <option value="5">In 5 minutes</option>
+            <option value="15">In 15 minutes</option>
+            <option value="30">In 30 minutes</option>
+            <option value="custom">Custom date &amp; time</option>
+          </select>
+        </label>
+        <label class="field" id="maintenanceCustomStartField" hidden>
+          <span>Custom start</span>
+          <input id="maintenanceCustomStart" type="datetime-local">
+        </label>
+        <label class="field">
+          <span>Shutdown duration</span>
+          <select id="maintenanceDurationMode" class="select">
+            <option value="15">15 minutes</option>
+            <option value="30">30 minutes</option>
+            <option value="60">1 hour</option>
+            <option value="120">2 hours</option>
+            <option value="custom">Custom duration</option>
+          </select>
+        </label>
+        <label class="field" id="maintenanceCustomDurationField" hidden>
+          <span>Custom minutes</span>
+          <input id="maintenanceCustomDuration" type="number" min="1" max="525600" step="1" value="1">
+          <small>Minimum 1 minute.</small>
+        </label>
+        <label class="field field--wide">
+          <span>Player message</span>
+          <textarea id="maintenanceMessage" class="admin-textarea" rows="3" maxlength="300">The game is shutting down for an update.</textarea>
+        </label>
+      </div>
+
+      <div class="admin-button-row admin-maintenance__actions">
+        <button class="btn btn--danger" id="maintenanceSchedule" type="button">Schedule shutdown</button>
+        <button class="btn btn--primary" id="maintenanceEnd" type="button" hidden>Enable game now</button>
+      </div>
+      <p class="account-status" id="maintenanceStatus"></p>
+    </section>
+
     <section class="card admin-updates" id="updatesPanel" hidden>
       <div class="admin-section-head">
         <div>

@@ -43,7 +43,7 @@ const appealsRefresh = document.getElementById("appealsRefresh");
 function setFeatureLab(open) {
   if (!featureLab) return;
   featureLab.hidden = !open;
-  document.querySelectorAll(".admin-search, .admin-announce, .admin-updates, .admin-codes, .admin-events, .admin-section-controls, .admin-mutation-events, .admin-analytics, .admin-shareholders, .admin-bank, .admin-economy, .admin-ip-audit, .admin-appeals, #equipmentAdminPanel, #petsAdminPanel, #searchResults, #playerPanel, #auditPanel").forEach((el) => {
+  document.querySelectorAll(".admin-search, .admin-announce, .admin-maintenance, .admin-updates, .admin-codes, .admin-events, .admin-section-controls, .admin-mutation-events, .admin-analytics, .admin-shareholders, .admin-bank, .admin-economy, .admin-ip-audit, .admin-appeals, #equipmentAdminPanel, #petsAdminPanel, #searchResults, #playerPanel, #auditPanel").forEach((el) => {
     if (el) el.hidden = open;
   });
   featureLabButton?.classList.toggle("is-active", open);
@@ -1359,6 +1359,134 @@ function wireAnnouncements() {
 
 
 // =========================================================
+// SCHEDULED GAME SHUTDOWN (admin only)
+// =========================================================
+
+function wireMaintenanceControls() {
+  const panel = document.getElementById("maintenancePanel");
+  if (!panel) return;
+  panel.hidden = false;
+
+  const state = document.getElementById("maintenanceState");
+  const statusLine = document.getElementById("maintenanceStatus");
+  const startMode = document.getElementById("maintenanceStartMode");
+  const customStartField = document.getElementById("maintenanceCustomStartField");
+  const customStart = document.getElementById("maintenanceCustomStart");
+  const durationMode = document.getElementById("maintenanceDurationMode");
+  const customDurationField = document.getElementById("maintenanceCustomDurationField");
+  const customDuration = document.getElementById("maintenanceCustomDuration");
+  const message = document.getElementById("maintenanceMessage");
+  const scheduleButton = document.getElementById("maintenanceSchedule");
+  const endButton = document.getElementById("maintenanceEnd");
+  const refreshButton = document.getElementById("maintenanceRefresh");
+
+  const pad = (value) => String(value).padStart(2, "0");
+  const localInputValue = (date) => `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}T${pad(date.getHours())}:${pad(date.getMinutes())}`;
+  customStart.value = localInputValue(new Date(Date.now() + 60 * 60 * 1000));
+
+  startMode.addEventListener("change", () => {
+    customStartField.hidden = startMode.value !== "custom";
+  });
+  durationMode.addEventListener("change", () => {
+    customDurationField.hidden = durationMode.value !== "custom";
+  });
+
+  async function loadMaintenanceStatus() {
+    refreshButton.disabled = true;
+    const { data, error } = await adminRequest("maintenance_status");
+    refreshButton.disabled = false;
+    if (error) {
+      state.innerHTML = `<span class="badge badge--danger">Unavailable</span><span>${escapeHtml(error.message)}</span>`;
+      return;
+    }
+
+    const window = data?.maintenance;
+    const now = new Date(data?.serverNow ?? Date.now()).getTime();
+    const starts = window?.starts_at ? new Date(window.starts_at).getTime() : NaN;
+    const ends = window?.ends_at ? new Date(window.ends_at).getTime() : NaN;
+    const scheduled = Number.isFinite(starts) && Number.isFinite(ends) && ends > now;
+    const active = scheduled && starts <= now;
+
+    if (!scheduled) {
+      state.innerHTML = '<span class="badge badge--positive">Online</span><span>The game is available to players.</span>';
+      endButton.hidden = true;
+      return;
+    }
+
+    const startLabel = new Date(starts).toLocaleString();
+    const endLabel = new Date(ends).toLocaleString();
+    state.innerHTML = active
+      ? `<span class="badge badge--danger">Shutdown active</span><span>Players are blocked until <strong>${escapeHtml(endLabel)}</strong>.</span>`
+      : `<span class="badge badge--warning">Scheduled</span><span>Notice is showing now. Shutdown: <strong>${escapeHtml(startLabel)}</strong> to <strong>${escapeHtml(endLabel)}</strong>.</span>`;
+    endButton.hidden = false;
+    endButton.textContent = active ? "Enable game now" : "Cancel scheduled shutdown";
+    if (window.message) message.value = window.message;
+  }
+
+  scheduleButton.addEventListener("click", async () => {
+    let startsAt;
+    if (startMode.value === "custom") {
+      startsAt = new Date(customStart.value);
+    } else {
+      startsAt = new Date(Date.now() + Number(startMode.value || 0) * 60_000);
+    }
+    const durationMinutes = Math.trunc(Number(
+      durationMode.value === "custom" ? customDuration.value : durationMode.value
+    ));
+    const shutdownMessage = message.value.trim();
+
+    if (Number.isNaN(startsAt.getTime())) {
+      notify.error("Invalid start time", "Choose when the shutdown should begin.");
+      return;
+    }
+    if (!Number.isSafeInteger(durationMinutes) || durationMinutes < 1) {
+      notify.error("Invalid duration", "Shutdown duration must be at least 1 minute.");
+      return;
+    }
+    if (!shutdownMessage) {
+      notify.error("Message required", "Tell players that the game is shutting down for an update.");
+      return;
+    }
+    if (!window.confirm(`Schedule this shutdown for ${startsAt.toLocaleString()}?`)) return;
+
+    scheduleButton.disabled = true;
+    const { data, error } = await adminRequest("maintenance_schedule", {
+      startsAt: startsAt.toISOString(),
+      durationMinutes,
+      message: shutdownMessage
+    });
+    scheduleButton.disabled = false;
+    if (error) {
+      notify.error("Could not schedule shutdown", error.message);
+      return;
+    }
+    const begins = new Date(data.maintenance.starts_at);
+    const ends = new Date(data.maintenance.ends_at);
+    statusLine.textContent = `Shutdown scheduled for ${begins.toLocaleString()} through ${ends.toLocaleString()}.`;
+    notify.success("Shutdown scheduled", startMode.value === "now" ? "The game is now offline for players." : "Players can now see the update notice.");
+    await loadMaintenanceStatus();
+  });
+
+  endButton.addEventListener("click", async () => {
+    if (!window.confirm("Enable the game immediately and clear this shutdown window?")) return;
+    endButton.disabled = true;
+    const { error } = await adminRequest("maintenance_end");
+    endButton.disabled = false;
+    if (error) {
+      notify.error("Could not enable game", error.message);
+      return;
+    }
+    statusLine.textContent = "The game has been enabled manually.";
+    notify.success("Game enabled", "Players can return as their status check refreshes.");
+    await loadMaintenanceStatus();
+  });
+
+  refreshButton.addEventListener("click", loadMaintenanceStatus);
+  loadMaintenanceStatus();
+}
+
+
+// =========================================================
 // UPDATE LOG PUBLISHER (admin only)
 // =========================================================
 
@@ -2071,6 +2199,7 @@ if (!user || !whoami?.isAdmin) {
   analyticsButton.disabled = false;
   if (featureLabButton) featureLabButton.disabled = false;
   wireAnnouncements();
+  wireMaintenanceControls();
   wireUpdateLogPublisher();
   wireCodes();
   tryWireAdminEvents();
@@ -2375,7 +2504,7 @@ const economyBreakdown = mountEconomy({
   const GROUPS = {
     search: ["#adminSearchCard", "#searchResults", "#playerPanel", "#auditPanel"],
     economy: ["#economyPanel", "#analyticsPanel", "#shareholdersPanel", "#bankPanel"],
-    content: ["#announcePanel", "#updatesPanel", "#codesPanel", "#eventsPanel", "#mutationEventsPanel", "#mutationCatalogPanel", "#sectionControlsPanel", "#customCatalogPanel", "#featureCatalogPanel"],
+    content: ["#maintenancePanel", "#announcePanel", "#updatesPanel", "#codesPanel", "#eventsPanel", "#mutationEventsPanel", "#mutationCatalogPanel", "#sectionControlsPanel", "#customCatalogPanel", "#featureCatalogPanel"],
     equipment: ["#equipmentAdminPanel"],
     pets: ["#petsAdminPanel"],
     workbench: ["#workbenchAdminPanel"],

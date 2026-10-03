@@ -43,6 +43,12 @@ export function startGlobalAutoRoll(page) {
       return;
     }
 
+    if (error.code === "game_maintenance") {
+      await updateSettings({ autoRoll: false });
+      notify.warning("Auto roll stopped", "The game is temporarily offline for an update.");
+      return;
+    }
+
     if (error.code !== "cooldown") {
       console.error("[AUTO ROLL] Background roll failed:", error);
     }

@@ -3829,6 +3829,51 @@ async function executeSingleRoll(
       });
 }
 
+type MaintenanceWindow = { starts_at: string | null; ends_at: string | null; message: string | null } | null;
+const MAINTENANCE_OWNER_ID = "38d5e8ce-18af-46d3-aa9e-6e601e75dd78";
+let maintenanceCache: { checkedAt: number; window: MaintenanceWindow } = { checkedAt: 0, window: null };
+
+// Keep the optimized roll hot path intact: each isolate refreshes this tiny
+// singleton at most once every five seconds instead of adding a database read
+// to every roll. A newly-started shutdown therefore becomes authoritative
+// within five seconds, while the player UI polls the same source separately.
+async function activeMaintenanceWindow(ctx: any): Promise<MaintenanceWindow> {
+  const now = Date.now();
+  if (now - maintenanceCache.checkedAt >= 5_000) {
+    const { data, error } = await ctx.supabaseAdmin
+      .from("game_maintenance")
+      .select("starts_at,ends_at,message")
+      .eq("id", "global")
+      .maybeSingle();
+    if (error) {
+      // Deploying the function before its migration must not accidentally
+      // take the game offline. Log once per cache interval and fail open.
+      console.error("Maintenance status check failed:", error.message);
+      maintenanceCache = { checkedAt: now, window: null };
+    } else {
+      maintenanceCache = { checkedAt: now, window: data ?? null };
+    }
+  }
+
+  const window = maintenanceCache.window;
+  if (!window?.starts_at || !window?.ends_at) return null;
+  const startsAt = Date.parse(window.starts_at);
+  const endsAt = Date.parse(window.ends_at);
+  return Number.isFinite(startsAt) && Number.isFinite(endsAt) && startsAt <= now && now < endsAt
+    ? window
+    : null;
+}
+
+async function rollIsAllowedDuringMaintenance(ctx: any, playerId: string): Promise<boolean> {
+  if (playerId === MAINTENANCE_OWNER_ID) return true;
+  const { data } = await ctx.supabaseAdmin
+    .from("admins")
+    .select("user_id")
+    .eq("user_id", playerId)
+    .maybeSingle();
+  return Boolean(data);
+}
+
 const authenticatedRollHandler = withSupabase(
   {
     auth: "user",
@@ -3837,6 +3882,16 @@ const authenticatedRollHandler = withSupabase(
     cors: "disabled"
   },
   async (req, ctx) => {
+      const playerId = String(ctx.userClaims?.id ?? ctx.userClaims?.sub ?? ctx.jwtClaims?.sub ?? "");
+      const maintenance = await activeMaintenanceWindow(ctx);
+      if (maintenance && !(await rollIsAllowedDuringMaintenance(ctx, playerId))) {
+        return jsonResponse({
+          error: "game_maintenance",
+          message: maintenance.message || "The game is temporarily offline for an update.",
+          endsAt: maintenance.ends_at
+        }, { status: 503 });
+      }
+
       const rateLimitResponse = await enforceRollRequestRateLimit(ctx);
       if (rateLimitResponse) return rateLimitResponse;
 

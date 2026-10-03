@@ -809,4 +809,30 @@
 .economy-breakdown .shareholders-table td { overflow-wrap:anywhere; }
 .economy-breakdown .shareholders-table td:last-child { white-space:normal; }
 .economy-supply strong { color:inherit; }
+.admin-maintenance__state {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin: 16px 0;
+  padding: 12px 14px;
+  border-radius: var(--radius-sm);
+  background: var(--surface-sunken);
+  color: var(--text-muted);
+}
+.admin-maintenance__form {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+}
+.admin-maintenance__form .field--wide { grid-column: 1 / -1; }
+.admin-maintenance__form textarea { width: 100%; resize: vertical; }
+.admin-maintenance__actions { margin-top: 14px; }
+.badge--positive { color: var(--positive, #36c275); }
+.badge--warning { color: #f5b23f; }
+.badge--danger { color: var(--negative, #e5534b); }
+@media (max-width: 620px) {
+  .admin-maintenance__form { grid-template-columns: 1fr; }
+  .admin-maintenance__form .field--wide { grid-column: auto; }
+  .admin-maintenance__state { align-items: flex-start; flex-direction: column; }
+}
 
