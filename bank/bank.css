@@ -106,6 +106,31 @@
   gap: 0.6rem;
 }
 
+/* ── Cheques ───────────────────────────────────────────── */
+.bank-cheque-form,
+.bank-cheque-lists {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 1rem;
+}
+.bank-cheque-lists { margin-top: 1.4rem; }
+.bank-cheque-lists h3 { margin: 0 0 0.5rem; font-size: 1rem; }
+.bank-cheque-list { margin: 0; padding: 0; list-style: none; }
+.bank-cheque-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.7rem;
+  padding: 0.7rem 0;
+  border-bottom: 1px solid var(--border);
+}
+.bank-cheque-row strong,
+.bank-cheque-row small { display: block; overflow-wrap: anywhere; }
+.bank-cheque-row small { margin-top: 0.2rem; color: var(--text-muted); font-size: 0.78rem; }
+.bank-cheque-row .btn { flex: none; }
+.bank-cheque-pages { display: flex; align-items: center; gap: 0.5rem; margin-top: 0.75rem; }
+.bank-cheque-pages span { color: var(--text-muted); font-size: 0.8rem; }
+
 /* ── Credit score ───────────────────────────────────────── */
 .credit-meter {
   height: 0.6rem;
@@ -218,9 +243,12 @@
   .bank-status { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .bank-grid { grid-template-columns: 1fr; }
   .bank-loan-grid { grid-template-columns: 1fr 1fr; }
+  .bank-cheque-lists { grid-template-columns: 1fr; }
 }
 @media (max-width: 480px) {
   .bank-loan-grid { grid-template-columns: 1fr; }
+  .bank-cheque-form { grid-template-columns: 1fr; gap: 0; }
+  .bank-cheque-row { align-items: flex-start; flex-direction: column; }
 }
 @media (prefers-reduced-motion: reduce) {
   .credit-meter > i { transition: none; }
