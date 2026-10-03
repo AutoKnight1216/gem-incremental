@@ -12,9 +12,11 @@ const migration = fs.readFileSync(new URL("../supabase/migrations/20260927081530
 const resultDetailsMigration = fs.readFileSync(new URL("../supabase/migrations/20260928143421_expose_lottery_result_details.sql", import.meta.url), "utf8");
 const randomizedRangesMigration = fs.readFileSync(new URL("../supabase/migrations/20260928145656_randomized_lottery_ranges.sql", import.meta.url), "utf8");
 const prizePoolMigration = fs.readFileSync(new URL("../supabase/migrations/20260930135909_expose_lottery_prize_pool.sql", import.meta.url), "utf8");
+const restrictionMigration = fs.readFileSync(new URL("../supabase/migrations/20261003143051_restrict_sixseven67_three_lotteries.sql", import.meta.url), "utf8");
 
 const PLAYER = "11111111-1111-4111-8111-111111111111";
 const OTHER = "22222222-2222-4222-8222-222222222222";
+const SIXSEVEN = "316c668e-1ab3-4e5f-bad0-8cd964a41440";
 
 async function setup() {
   const db = new PGlite();
@@ -49,18 +51,102 @@ async function setup() {
     create trigger economy_bank_update after update of balance on public.bank_accounts for each row execute function economy_private.capture_cash('bank','balance','player_id');
     create function public.bank_touch(p_uid uuid) returns void language plpgsql security definer as $$
     begin insert into public.bank_accounts(player_id) values(p_uid) on conflict(player_id) do nothing; end $$;
-    insert into auth.users values('${PLAYER}'),('${OTHER}');
+    insert into auth.users values('${PLAYER}'),('${OTHER}'),('${SIXSEVEN}');
     insert into public.players(id,username,money,lifetime_earnings) values
-      ('${PLAYER}','Tester',1000000,0),('${OTHER}','OfflineWinner',0,0);
-    insert into public.bank_accounts(player_id,balance) values('${PLAYER}',500000);
+      ('${PLAYER}','Tester',1000000,0),('${OTHER}','OfflineWinner',0,0),('${SIXSEVEN}','sixseven67',1000000,0);
+    insert into public.bank_accounts(player_id,balance) values('${PLAYER}',500000),('${SIXSEVEN}',500000);
     select set_config('request.jwt.claim.sub','${PLAYER}',false);
   `);
   await db.exec(migration);
   await db.exec(resultDetailsMigration);
   await db.exec(randomizedRangesMigration);
   await db.exec(prizePoolMigration);
+  await db.exec(restrictionMigration);
   return db;
 }
+
+test("restricted entries refund atomically to wallet/bank and all three blocked draws reject entry", async () => {
+  const db = await setup();
+  try {
+    await db.exec(`delete from public.lottery_draws;
+      delete from public.lottery_participation_restrictions where player_id='${SIXSEVEN}';
+      select set_config('request.jwt.claim.sub','${SIXSEVEN}',false);
+      insert into public.lottery_draws(id,draw_date,open_at,cutoff_at,draw_at,next_open_at,status,payout_basis_points)
+      values('TEST-RESTRICTED',current_date,now()-interval '1 hour',now()+interval '1 hour',now()+interval '2 hours',now()+interval '2 hours 5 minutes','open',8500);`);
+
+    await db.query("select public.purchase_lottery_tickets(10,'wallet','61616161-6161-4161-8161-616161616161')");
+    await db.query("select public.purchase_lottery_tickets(5,'bank','67676767-6767-4767-8767-676767676767')");
+    await db.exec(`insert into public.lottery_participation_restrictions(
+        player_id,blocked_from_draw_date,blocked_through_draw_date,eligible_at,draw_count,message)
+      values('${SIXSEVEN}',current_date,current_date+2,
+        (current_date+2+time '22:05') at time zone 'Asia/Singapore',3,
+        'to ensure that everyone can have a chance at wining the lottery, you have been temporarily been prohibited from participating for 3 lotteries.');`);
+
+    const refund = (await db.query(`select lottery_private.refund_restricted_lottery_entries('${SIXSEVEN}') result`)).rows[0].result;
+    assert.equal(Number(refund.tickets),15);
+    assert.equal(Number(refund.wallet),100000);
+    assert.equal(Number(refund.bank),50000);
+
+    const state = (await db.query(`select p.money,b.balance,d.total_tickets,d.unique_participants,d.gross_revenue,
+        (select count(*) from public.lottery_allocations where player_id='${SIXSEVEN}') allocations,
+        (select count(*) from public.lottery_purchase_requests where player_id='${SIXSEVEN}' and outcome='refunded_restriction') refunded_requests
+      from public.players p join public.bank_accounts b on b.player_id=p.id
+      join public.lottery_draws d on d.id='TEST-RESTRICTED' where p.id='${SIXSEVEN}'`)).rows[0];
+    assert.equal(Number(state.money),1000000);
+    assert.equal(Number(state.balance),500000);
+    assert.equal(Number(state.total_tickets),0);
+    assert.equal(state.unique_participants,0);
+    assert.equal(Number(state.gross_revenue),0);
+    assert.equal(Number(state.allocations),0);
+    assert.equal(Number(state.refunded_requests),2);
+
+    const ledger = (await db.query(`select account,amount,direction,reference from public.economy_cash_ledger
+      where player_id='${SIXSEVEN}' order by id`)).rows;
+    assert.deepEqual(ledger.map(row => [row.account,Number(row.amount),row.direction]),[
+      ["wallet",-100000,"sink"],["bank",-50000,"sink"],
+      ["wallet",100000,"source"],["bank",50000,"source"]
+    ]);
+    assert.equal(ledger.reduce((sum,row) => sum+Number(row.amount),0),0);
+    assert.match(ledger[2].reference,/^lottery-restriction-refund:TEST-RESTRICTED:/);
+    const refundTransaction = (await db.query(`select kind,amount,memo from public.bank_transactions
+      where player_id='${SIXSEVEN}' and kind='lottery_refund'`)).rows[0];
+    assert.equal(Number(refundTransaction.amount),50000);
+
+    const walletBefore = (await db.query("select money from public.players where id=$1",[SIXSEVEN])).rows[0].money;
+    await assert.rejects(
+      db.query("select public.purchase_lottery_tickets(1,'wallet','73737373-7373-4373-8373-737373737373')"),
+      /lottery_participation_restricted/
+    );
+    const walletAfter = (await db.query("select money from public.players where id=$1",[SIXSEVEN])).rows[0].money;
+    assert.equal(walletAfter,walletBefore);
+
+    const payload = (await db.query("select public.get_daily_lottery() result")).rows[0].result;
+    assert.equal(payload.participationRestriction.blockedDrawsRemaining,3);
+    assert.equal(payload.participationRestriction.message,
+      "to ensure that everyone can have a chance at wining the lottery, you have been temporarily been prohibited from participating for 3 lotteries.");
+
+    await db.exec(`insert into public.lottery_draws(id,draw_date,open_at,cutoff_at,draw_at,next_open_at,status,payout_basis_points)
+      values
+        ('TEST-BLOCKED-2',current_date+1,now()-interval '1 hour',now()+interval '1 hour',now()+interval '2 hours',now()+interval '2 hours 5 minutes','open',8500),
+        ('TEST-BLOCKED-3',current_date+2,now()-interval '1 hour',now()+interval '1 hour',now()+interval '2 hours',now()+interval '2 hours 5 minutes','open',8500),
+        ('TEST-ELIGIBLE',current_date+3,now()-interval '1 hour',now()+interval '1 hour',now()+interval '2 hours',now()+interval '2 hours 5 minutes','open',8500)
+      on conflict(draw_date) do update set status='open';`);
+    await assert.rejects(
+      db.exec(`insert into public.lottery_allocations(draw_id,player_id,ticket_count,purchase_total)
+        select id,'${SIXSEVEN}',1,10000 from public.lottery_draws where draw_date=current_date+1`),
+      /lottery_participation_restricted/
+    );
+    await assert.rejects(
+      db.exec(`insert into public.lottery_allocations(draw_id,player_id,ticket_count,purchase_total)
+        select id,'${SIXSEVEN}',1,10000 from public.lottery_draws where draw_date=current_date+2`),
+      /lottery_participation_restricted/
+    );
+    await db.exec(`insert into public.lottery_allocations(draw_id,player_id,ticket_count,purchase_total)
+      select id,'${SIXSEVEN}',1,10000 from public.lottery_draws where draw_date=current_date+3`);
+  } finally {
+    await db.close();
+  }
+});
 
 test("live payable pool and completed result economics are public without exposing current tax", async () => {
   const db = await setup();

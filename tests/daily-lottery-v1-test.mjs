@@ -6,6 +6,7 @@ const read = (path) => fs.readFileSync(new URL(`../${path}`, import.meta.url), "
 const sql = read("supabase/migrations/20260927081530_daily_lottery_v1.sql");
 const prizePoolSql = read("supabase/migrations/20260930135909_expose_lottery_prize_pool.sql");
 const randomizedRangesSql = read("supabase/migrations/20260928145656_randomized_lottery_ranges.sql");
+const restrictionSql = read("supabase/migrations/20261003143051_restrict_sixseven67_three_lotteries.sql");
 const client = read("src/backend/cloudLottery.js");
 const page = read("lottery/lottery.js");
 const html = read("lottery/index.html");
@@ -195,6 +196,26 @@ test("large-purchase safeguards, recent public results, and offline win acknowle
   assert.match(sql,/winner_notified_at/);
   assert.match(sql,/order by draw_date desc limit 10/);
   assert.match(client,/purchase_lottery_tickets/);
+});
+
+test("sixseven67 is server-blocked for exactly three draws with an atomic original-source refund", () => {
+  const dashboard = functionBody("get_daily_lottery", restrictionSql);
+  assert.match(restrictionSql,/316c668e-1ab3-4e5f-bad0-8cd964a41440/);
+  assert.match(restrictionSql,/v_blocked_through:=v_draw\.draw_date\+2/);
+  assert.match(restrictionSql,/time '22:05'\) at time zone 'Asia\/Singapore'/);
+  assert.match(restrictionSql,/lottery_participation_restricted/);
+  assert.match(restrictionSql,/funding_source='wallet'/);
+  assert.match(restrictionSql,/funding_source='bank'/);
+  assert.match(restrictionSql,/total_tickets=total_tickets-v_ticket_count/);
+  assert.match(restrictionSql,/gross_revenue=gross_revenue-v_purchase_total/);
+  assert.match(restrictionSql,/outcome='refunded_restriction'/);
+  assert.match(restrictionSql,/\('refund_restricted_lottery_entries','lottery','source'\)/);
+  assert.match(dashboard,/'participationRestriction',v_restriction/);
+  assert.match(dashboard,/'eligibleAt',r\.eligible_at/);
+  assert.match(html,/id="lotteryRestriction"/);
+  assert.match(html,/to ensure that everyone can have a chance at wining the lottery, you have been temporarily been prohibited from participating for 3 lotteries\./);
+  assert.match(page,/data\.participationRestriction\?\.eligibleAt/);
+  assert.match(page,/lotteryContent"\)\.hidden = Boolean\(restriction\)/);
 });
 
 test("admin analytics cover spending, payout, burn, participation, concentration, sink share, and faucet offset", () => {

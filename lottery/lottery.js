@@ -90,9 +90,11 @@ function cost() {
 
 function countdown(target) {
   const seconds = Math.max(0, Math.ceil((new Date(target).getTime() - (Date.now() + serverOffset)) / 1000));
-  const hours = Math.floor(seconds / 3600);
+  const days = Math.floor(seconds / 86400);
+  const hours = Math.floor((seconds % 86400) / 3600);
   const minutes = Math.floor((seconds % 3600) / 60);
   const secs = seconds % 60;
+  if (days) return `${days}d ${String(hours).padStart(2,"0")}h ${String(minutes).padStart(2,"0")}m ${String(secs).padStart(2,"0")}s`;
   return hours ? `${hours}h ${String(minutes).padStart(2,"0")}m ${String(secs).padStart(2,"0")}s` : `${minutes}m ${String(secs).padStart(2,"0")}s`;
 }
 
@@ -152,6 +154,17 @@ function renderResults() {
 }
 
 function render() {
+  const restriction = data.participationRestriction;
+  $("lotteryRestriction").hidden = !restriction;
+  $("lotteryContent").hidden = Boolean(restriction);
+  if (restriction) {
+    $("restrictionMessage").textContent = restriction.message;
+    $("restrictionCountdown").textContent = countdown(restriction.eligibleAt);
+    clearTimeout(boundaryRefresh);
+    const delay = Math.max(1000, new Date(restriction.eligibleAt).getTime() - (Date.now() + serverOffset) + 750);
+    boundaryRefresh = setTimeout(refresh, Math.min(delay, 2_147_000_000));
+    return;
+  }
   retargetPrizePool(data.prizePool,data.drawId);
   renderStatus();
   $("ownTickets").textContent = `Your tickets: ${exactTickets(data.ownTickets)}`;
@@ -250,7 +263,8 @@ $("buyTickets").addEventListener("click", buy);
 setInterval(() => {
   const node = document.querySelector("[data-countdown]");
   if (!node || !data) return;
-  const target = data.phase === "open" ? data.cutoffAt : data.phase === "locked" ? data.drawAt : data.nextSalesOpenAt;
+  const target = data.participationRestriction?.eligibleAt
+    || (data.phase === "open" ? data.cutoffAt : data.phase === "locked" ? data.drawAt : data.nextSalesOpenAt);
   node.textContent = countdown(target);
 }, 1000);
 setInterval(() => refresh({ quiet: true }), POOL_POLL_MS);
