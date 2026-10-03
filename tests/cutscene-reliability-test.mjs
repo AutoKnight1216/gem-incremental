@@ -62,7 +62,7 @@ assert.equal(getCutsceneDefinition({ rarity: 100_000_000, gemName: "Heart of Xy"
 assert.equal(getCutsceneDefinition({ rarity: 666_666_666, gemName: "one singular grain of sand" }).theme, "singular-sand");
 assert.equal(cutsceneDuration({ rarity: 666_666_666, gemName: "one singular grain of sand", mobile: false, reducedMotion: false }), 15_000);
 assert.deepEqual(BESPOKE_CUTSCENES["one singular grain of sand"].primitives, ["sand"]);
-assert.equal(Object.keys(BESPOKE_CUTSCENES).length, 65, "the locked scenes, Deepcore, Deep Sea, draft material scenes, and legacy XY alias must be registered");
+assert.equal(Object.keys(BESPOKE_CUTSCENES).length, 69, "the locked scenes, Deepcore, Deep Sea, weekly gems, draft material scenes, and legacy XY alias must be registered");
 const draftMaterialScenes = [
   ["touch grass", "touch-grass", 12_500],
   ["asterism", "asterism", 13_000],
@@ -82,6 +82,24 @@ for (const [name, theme, duration] of draftMaterialScenes) {
   assert.equal(definition.includeInReminiscite, true, `${name} must contribute one approved frame to Reminiscite`);
   assert.deepEqual(definition.primitives, [theme], `${name} must own a unique scene primitive`);
 }
+const weeklyGemScenes = [
+  ["incandescity", "incandescity", 13_500],
+  ["chronofracture", "chronofracture", 15_500],
+  ["ore+", "ore-plus", 16_000],
+  ["300", "three-hundred", 14_500]
+];
+for (const [name, theme, duration] of weeklyGemScenes) {
+  const definition = BESPOKE_CUTSCENES[name];
+  assert.equal(definition.theme, theme, `${name} must route to its bespoke weekly scene`);
+  assert.equal(definition.duration, duration, `${name} must retain ceremonial pacing`);
+  assert.equal(definition.focus, false, `${name} must tell its story without the generic specimen setup`);
+  assert.equal(definition.includeInReminiscite, true, `${name} must contribute one permanent memory frame`);
+  assert.deepEqual(definition.primitives, [theme], `${name} must own a unique scene primitive`);
+}
+assert.equal(BESPOKE_CUTSCENES["300"].beats.length, 0, "300 must communicate its milestone visually");
+assert.deepEqual(BESPOKE_CUTSCENES.incandescity.beats, ["THERMAL OUTPUT: 0"]);
+assert.deepEqual(BESPOKE_CUTSCENES.chronofracture.beats, ["T−1  //  T  //  T+1"]);
+assert.deepEqual(BESPOKE_CUTSCENES["ore+"].beats, ["MOVEMENT DETECTED"]);
 assert.equal(isCutsceneEligible({ rarity: 1_000, gemName: "Zephyrion", threshold: 100_000 }), true, "Zephyrion must retain its source-exclusive bespoke reveal below the generic threshold");
 assert.equal(cutsceneDuration({ rarity: 145_000_000, gemName: "Deepcore Geode", mobile: false, reducedMotion: false }), 12_500);
 assert.equal(cutsceneDuration({ rarity: 250_000_000, gemName: "Crystalline Singularity", mobile: false, reducedMotion: false }), 13_500);
@@ -263,11 +281,11 @@ const precedingCutsceneThemes = Array.from(new Set(
     .map((definition) => definition.theme)
 )).filter((theme) => theme !== "memory");
 assert.deepEqual(
-  REMINISCITE_MEMORY_FRAMES,
-  precedingCutsceneThemes,
+  new Set(REMINISCITE_MEMORY_FRAMES),
+  new Set(precedingCutsceneThemes),
   "Reminiscite must preserve one standout frame from every preceding 100M+ cutscene"
 );
-assert.equal(new Set(REMINISCITE_MEMORY_FRAMES).size, 45);
+assert.equal(new Set(REMINISCITE_MEMORY_FRAMES).size, 49);
 for (const theme of deepcoreThemes) {
   assert.equal(REMINISCITE_MEMORY_FRAMES.includes(theme), false, `${theme} must remain exclusive to Deepcore`);
 }
@@ -282,6 +300,9 @@ for (const theme of limitedEventThemes) {
 }
 assert.ok(REMINISCITE_MEMORY_FRAMES.includes("singular-sand"));
 for (const [, theme] of draftMaterialScenes) {
+  assert.equal(REMINISCITE_MEMORY_FRAMES.filter((frame) => frame === theme).length, 1, `${theme} must contribute exactly one standout memory frame`);
+}
+for (const [, theme] of weeklyGemScenes) {
   assert.equal(REMINISCITE_MEMORY_FRAMES.filter((frame) => frame === theme).length, 1, `${theme} must contribute exactly one standout memory frame`);
 }
 assert.match(scenes, /2\.5 \* Math\.pow\(0\.4 \/ 2\.5, progress\)/);

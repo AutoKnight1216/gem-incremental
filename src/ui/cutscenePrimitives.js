@@ -31,7 +31,8 @@ export const REMINISCITE_MEMORY_FRAMES = Object.freeze([
   "ascend", "impact", "polaris", "false-ending", "primordial", "analysis",
   "ocean", "perfect-id", "lunar-impact", "journey", "where", "last-light",
   "lunar", "wrong", "aurora", "reality", "tranquillity", "black-hole",
-  "cat", "master-analysis", "singular-sand", "almost", "glitched-gem", "finality"
+  "cat", "master-analysis", "singular-sand", "incandescity", "chronofracture",
+  "ore-plus", "three-hundred", "almost", "glitched-gem", "finality"
 ]);
 
 const primitiveMarkup = Object.freeze({
@@ -90,6 +91,10 @@ const primitiveMarkup = Object.freeze({
   cat: `<div class="cs-cat"><span class="cs-paw"></span><i></i><i></i></div>`,
   master: `<div class="cs-master"><i></i><i></i><i></i><i></i><i></i><i></i></div>`,
   sand: `<div class="cs-sand"><span class="cs-sand-haze"></span><span class="cs-dune cs-dune--far"></span><span class="cs-dune cs-dune--near"></span><span class="cs-sandfield"></span><span class="cs-sand-beam"></span><span class="cs-single-grain"></span></div>`,
+  incandescity: `<div class="cs-incandescity"><span class="cs-inc-darkness"></span><div class="cs-inc-rays"><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i></div><span class="cs-inc-cold-halo"></span><span class="cs-inc-solid-light"></span></div>`,
+  chronofracture: `<div class="cs-chronofracture"><div class="cs-chrono-panels"><i></i><i></i><i></i></div><div class="cs-chrono-rings"><i></i><i></i><i></i></div><div class="cs-chrono-shards"><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i></div><span class="cs-chrono-moment"></span></div>`,
+  "ore-plus": `<div class="cs-ore-plus"><div class="cs-ore-stars"><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i></div><span class="cs-ore-trail"></span><div class="cs-ore-asteroid"><i></i><b></b><em></em></div><div class="cs-ore-tendrils"><i></i><i></i><i></i><i></i><i></i></div></div>`,
+  "three-hundred": `<div class="cs-three-hundred"><div class="cs-three-hundred-grid"><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i></div><span class="cs-three-hundred-number">300</span><div class="cs-three-hundred-rings"><i></i><i></i><i></i></div></div>`,
   counter: `<div class="cs-counter-track"><i></i></div>`,
   glitch: `<div class="cs-glitch-tears"><i></i><i></i><i></i><i></i><i></i></div>`,
   void: `<span class="cs-final-line"></span>`,
