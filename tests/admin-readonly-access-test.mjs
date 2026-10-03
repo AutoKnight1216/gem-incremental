@@ -16,15 +16,20 @@ for (const action of ["search", "inspect", "audit", "analytics", "market_fee_ana
 assert.match(edge, /adminId !== OWNER_ADMIN_ID && !READ_ONLY_ACTIONS\.has\(action\)/);
 assert.match(edge, /error: "admin_read_only"/);
 assert.match(edge, /canWrite, access: canWrite \? "owner" : "read_only"/);
+assert.match(edge, /\.from\("admin_viewers"\)/);
 
 assert.match(migration, /bddf7c33-e69c-44e5-98db-3bcc10e582ba/);
 assert.match(migration, /657b756e-c21e-40ab-b2b5-b13403f89039/);
 assert.match(migration, /where exists \(select 1 from auth\.users/);
+assert.match(migration, /create table if not exists public\.admin_viewers/);
+assert.match(migration, /delete from public\.admins[\s\S]*user_id <> '004d883f-edbc-4610-b5e3-9068a0de0ca2'/);
+assert.match(migration, /pg_get_functiondef\(p\.oid\)[\s\S]*38d5e8ce-18af-46d3-aa9e-6e601e75dd78/);
 
 assert.doesNotMatch(html, /id="shareholdersPanel"/);
 assert.doesNotMatch(html, /data-admin-tab="(?:equipment|pets|workbench|limited-events)"/);
 assert.match(admin, /if \(!canWriteAdmin\) return;/);
 assert.match(admin, /button\.hidden = true/);
+assert.match(admin, /!canWriteAdmin && name !== "search"/);
 assert.match(admin, /playerPanel\.querySelectorAll\("input, select, textarea, button\[data-action\]"\)/);
 
 console.log("admin-readonly-access-test passed");

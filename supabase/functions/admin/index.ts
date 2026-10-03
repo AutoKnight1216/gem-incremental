@@ -34,7 +34,20 @@ async function isAdmin(ctx: any, id: string | undefined) {
     return false;
   }
 
-  return data?.user_id === id;
+  if (data?.user_id === id) return true;
+
+  const { data: viewer, error: viewerError } = await ctx.supabaseAdmin
+    .from("admin_viewers")
+    .select("user_id")
+    .eq("user_id", id)
+    .maybeSingle();
+
+  if (viewerError) {
+    console.error("Read-only admin lookup failed:", viewerError);
+    return false;
+  }
+
+  return viewer?.user_id === id;
 }
 
 const GEM_CATALOG = [

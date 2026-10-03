@@ -2498,7 +2498,7 @@ const economyBreakdown = mountEconomy({
   let active = "search";
 
   function showAdminTab(name) {
-    if (!canWriteAdmin && !["search", "economy", "community"].includes(name)) return;
+    if (!canWriteAdmin && name !== "search") return;
     if (!pages[name]) return;
     active = name;
     for (const [tab, page] of Object.entries(pages)) page.hidden = tab !== name;
@@ -2512,7 +2512,7 @@ const economyBreakdown = mountEconomy({
   }
 
   tabBar.querySelectorAll("[data-admin-tab]").forEach((button) => {
-    if (!canWriteAdmin && !["search", "economy", "community"].includes(button.dataset.adminTab)) {
+    if (!canWriteAdmin && button.dataset.adminTab !== "search") {
       button.hidden = true;
       return;
     }
