@@ -8,6 +8,8 @@ const index = read("../gem-index/index.js");
 
 assert.match(migration, /'300'[\s\S]*?"catalogueOrder":300/);
 assert.match(migration, /'Ore\+'[\s\S]*?automaticConsumptionProtected/);
+assert.match(migration, /'Chronofracture', 275000000,/);
+assert.match(migration, /'Incandescity', 2000000000,/);
 assert.match(migration, /'i', 1, 1, 0[\s\S]*?"displayRarity":-1[\s\S]*?"normalRng":false/);
 assert.match(migration, /where player_id = v_player_id and gem_name = 'π'[\s\S]*?gem_name = 'e'/);
 assert.match(migration, /locked, museum_locked, luck_at_roll[\s\S]*?true, false, 1/);

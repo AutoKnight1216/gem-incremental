@@ -125,6 +125,8 @@ for (const name of [
 
 const milestone = catalogue.find((gem) => gem.name === "300");
 assert.equal(milestone.metadata.catalogueOrder, 300);
+assert.equal(Number(catalogue.find((gem) => gem.name === "Chronofracture").rarity), 275_000_000);
+assert.equal(Number(catalogue.find((gem) => gem.name === "Incandescity").rarity), 2_000_000_000);
 const imaginary = catalogue.find((gem) => gem.name === "i");
 assert.equal(Number(imaginary.rarity), 1, "positive storage rarity preserves the DB constraint");
 assert.equal(imaginary.metadata.displayRarity, -1);
