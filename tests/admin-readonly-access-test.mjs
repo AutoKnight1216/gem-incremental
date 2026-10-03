@@ -13,7 +13,7 @@ assert.match(edge, /const READ_ONLY_ACTIONS = new Set/);
 for (const action of ["search", "inspect", "audit", "analytics", "market_fee_analytics", "museum_analytics"]) {
   assert.match(edge, new RegExp(`"${action}"`));
 }
-assert.match(edge, /adminId !== OWNER_ADMIN_ID && !READ_ONLY_ACTIONS\.has\(action\)/);
+assert.match(edge, /!canWriteAdmin && !READ_ONLY_ACTIONS\.has\(action\)/);
 assert.match(edge, /error: "admin_read_only"/);
 assert.match(edge, /canWrite, access: canWrite \? "owner" : "read_only"/);
 assert.match(edge, /\.from\("admin_viewers"\)/);
@@ -29,7 +29,14 @@ assert.doesNotMatch(html, /id="shareholdersPanel"/);
 assert.doesNotMatch(html, /data-admin-tab="(?:equipment|pets|workbench|limited-events)"/);
 assert.match(admin, /if \(!canWriteAdmin\) return;/);
 assert.match(admin, /button\.hidden = true/);
-assert.match(admin, /!canWriteAdmin && name !== "search"/);
+assert.match(admin, /\["search", "economy"\]\.includes\(name\)/);
 assert.match(admin, /playerPanel\.querySelectorAll\("input, select, textarea, button\[data-action\]"\)/);
+
+assert.match(edge, /function censoredEmail\(value: unknown\)/);
+assert.match(edge, /function censorEmailsDeep\(value: any\)/);
+assert.match(edge, /email: canWriteAdmin \? user\?\.email \?\? null : censoredEmail\(user\?\.email\)/);
+assert.match(edge, /playerSummary\(ctx, player, !canWriteAdmin\)/);
+assert.match(edge, /canWriteAdmin && String\(user\?\.email/);
+assert.match(edge, /entries: canWriteAdmin \? data \?\? \[\] : censorEmailsDeep\(data \?\? \[\]\)/);
 
 console.log("admin-readonly-access-test passed");

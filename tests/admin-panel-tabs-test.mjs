@@ -32,7 +32,7 @@ assert.match(js, /page\.hidden = tab !== name/);
 assert.doesNotMatch(js, /adminFeatureLab["']\]/);
 // Heavy panels load only when their tab is first opened.
 assert.match(js, /const LAZY = \{[\s\S]*loadAnalytics[\s\S]*loadIpAudit/);
-assert.match(js, /!canWriteAdmin && name !== "search"/);
+assert.match(js, /\["search", "economy"\]\.includes\(name\)/);
 assert.match(js, /whoami\.canWrite === true/);
 assert.match(js, /Read-only administrator access verified/);
 assert.doesNotMatch(js, /setTimeout\(\(\)=>\{[^}]*loadEquipmentAdmin/);
