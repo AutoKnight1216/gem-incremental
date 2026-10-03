@@ -114,6 +114,38 @@
   gap: 1rem;
 }
 .bank-cheque-lists { margin-top: 1.4rem; }
+.bank-recipient-field { position: relative; }
+.bank-recipient-options {
+  position: absolute;
+  z-index: 20;
+  top: 100%;
+  left: 0;
+  right: 0;
+  max-height: 15rem;
+  overflow-y: auto;
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-sm);
+  background: var(--surface-raised);
+  box-shadow: 0 0.5rem 1.5rem #0003;
+}
+.bank-recipient-options[hidden] { display: none; }
+.bank-recipient-option,
+.bank-recipient-more {
+  display: block;
+  width: 100%;
+  padding: 0.55rem 0.75rem;
+  border: 0;
+  background: transparent;
+  color: var(--text);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+.bank-recipient-option:hover,
+.bank-recipient-option[aria-selected="true"],
+.bank-recipient-more:hover { background: var(--surface-sunken); }
+.bank-recipient-more { color: var(--accent); font-weight: 700; }
+.bank-recipient-hint { margin: 0; padding: 0.55rem 0.75rem; color: var(--text-muted); font-size: 0.84rem; }
 .bank-cheque-lists h3 { margin: 0 0 0.5rem; font-size: 1rem; }
 .bank-cheque-list { margin: 0; padding: 0; list-style: none; }
 .bank-cheque-row {

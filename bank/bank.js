@@ -1,6 +1,6 @@
 import { mountShell } from "../src/ui/shell.js";
 import { loadBankDashboard, bankDeposit, bankWithdraw, bankBorrow, bankRepay, bankDeclareBankruptcy,
-  loadBankCheques, bankIssueCheque, bankCashCheque, bankCancelCheque } from "../src/backend/cloudBank.js";
+  loadBankCheques, bankIssueCheque, bankCashCheque, bankCancelCheque, searchChequeRecipients } from "../src/backend/cloudBank.js";
 import { formatMoney, escapeHtml, formatRelativeTime } from "../src/ui/format.js";
 import { confirmDialog } from "../src/ui/dialog.js";
 import { notify } from "../src/ui/toast.js";
@@ -21,6 +21,15 @@ let chequeError = null;
 let incomingOffset = 0;
 let outgoingOffset = 0;
 let busy = false;
+let recipientMatches = [];
+let recipientOffset = 0;
+let recipientHasMore = false;
+let recipientOpen = false;
+let recipientLoading = false;
+let recipientError = "";
+let recipientActive = -1;
+let recipientRequest = 0;
+let recipientTimer;
 
 const KIND_LABEL = {
   deposit: "Deposit", withdraw: "Withdrawal", borrow: "Loan drawn", repay: "Repayment",
@@ -136,8 +145,10 @@ function renderCheques() {
       When they cash it, <strong>7.5% is removed as tax</strong> and they receive the rest.
       You can cancel an uncashed cheque for a full refund. Up to 20 cheques may be pending at once.</p>
     <div class="bank-cheque-form">
-      <div class="bank-field"><label for="chequeRecipient">Recipient username</label>
-        <input id="chequeRecipient" type="text" maxlength="20" autocomplete="off" placeholder="Player name"></div>
+      <div class="bank-field bank-recipient-field"><label for="chequeRecipient">Recipient username</label>
+        <input id="chequeRecipient" type="text" maxlength="20" autocomplete="off" placeholder="Search players"
+          role="combobox" aria-autocomplete="list" aria-expanded="false" aria-controls="chequeRecipientOptions">
+        <div id="chequeRecipientOptions" class="bank-recipient-options" role="listbox" hidden></div></div>
       <div class="bank-field"><label for="chequeAmount">Face value</label>
         <input id="chequeAmount" type="number" min="1" max="1000000000000" step="1" inputmode="numeric" placeholder="0"></div>
     </div>
@@ -154,6 +165,67 @@ function renderCheques() {
         : '<p class="bank-note">No cheques on this page.</p>'}
         ${chequePages("outgoing", outgoingOffset, outgoingPage.length > 30)}</section>
     </div>`;
+  renderRecipientSuggestions();
+}
+
+function renderRecipientSuggestions() {
+  const input = $("chequeRecipient");
+  const list = $("chequeRecipientOptions");
+  if (!input || !list) return;
+  list.hidden = !recipientOpen;
+  input.setAttribute("aria-expanded", String(recipientOpen));
+  if (!recipientOpen) {
+    input.removeAttribute("aria-activedescendant");
+    return;
+  }
+  list.innerHTML = recipientMatches.map((player, index) =>
+    `<button id="chequeRecipientOption${index}" class="bank-recipient-option" type="button" role="option"
+      aria-selected="${index === recipientActive}" data-recipient-index="${index}" tabindex="-1">${escapeHtml(player.username)}</button>`
+  ).join("") + (recipientLoading ? '<p class="bank-recipient-hint">Loading players…</p>' : "")
+    + (recipientError ? `<p class="bank-recipient-hint">${escapeHtml(recipientError)}</p>` : "")
+    + (!recipientLoading && !recipientError && !recipientMatches.length ? '<p class="bank-recipient-hint">No matching players.</p>' : "")
+    + (recipientHasMore ? '<button class="bank-recipient-more" type="button" data-recipient-more>Show more players</button>' : "");
+  if (recipientActive >= 0) input.setAttribute("aria-activedescendant", `chequeRecipientOption${recipientActive}`);
+  else input.removeAttribute("aria-activedescendant");
+}
+
+async function loadRecipients(reset = false) {
+  const input = $("chequeRecipient");
+  if (!input) return;
+  const query = input.value.trim();
+  if (reset) {
+    recipientMatches = [];
+    recipientOffset = 0;
+    recipientHasMore = false;
+    recipientActive = -1;
+  }
+  const requestId = ++recipientRequest;
+  recipientLoading = true;
+  recipientError = "";
+  renderRecipientSuggestions();
+  const result = await searchChequeRecipients(query, recipientOffset);
+  if (requestId !== recipientRequest || !recipientOpen || $("chequeRecipient") !== input || input.value.trim() !== query) return;
+  recipientLoading = false;
+  if (result.error) {
+    recipientError = "Could not load players. You can still type an exact username.";
+  } else {
+    recipientMatches.push(...result.data.players);
+    recipientOffset = result.data.nextOffset;
+    recipientHasMore = result.data.hasMore;
+  }
+  renderRecipientSuggestions();
+}
+
+function selectRecipient(index) {
+  const player = recipientMatches[index];
+  const input = $("chequeRecipient");
+  if (!player || !input) return;
+  input.value = player.username;
+  input.focus();
+  recipientOpen = false;
+  ++recipientRequest;
+  clearTimeout(recipientTimer);
+  renderRecipientSuggestions();
 }
 
 function chequePages(direction, offset, hasMore) {
@@ -297,9 +369,49 @@ async function refresh() {
 
 document.addEventListener("input", (event) => {
   if (event.target?.id === "chequeAmount") updateChequeQuote();
+  if (event.target?.id === "chequeRecipient") {
+    recipientOpen = true;
+    clearTimeout(recipientTimer);
+    recipientTimer = setTimeout(() => loadRecipients(true), 180);
+  }
+});
+
+document.addEventListener("focusin", (event) => {
+  if (event.target?.id === "chequeRecipient") {
+    recipientOpen = true;
+    loadRecipients(true);
+  }
+});
+
+document.addEventListener("keydown", (event) => {
+  if (event.target?.id !== "chequeRecipient") return;
+  if (event.key === "Escape") {
+    recipientOpen = false;
+    renderRecipientSuggestions();
+  } else if (event.key === "ArrowDown" || event.key === "ArrowUp") {
+    event.preventDefault();
+    if (!recipientOpen) { recipientOpen = true; loadRecipients(true); return; }
+    if (!recipientMatches.length) return;
+    const change = event.key === "ArrowDown" ? 1 : -1;
+    recipientActive = recipientActive < 0
+      ? (change > 0 ? 0 : recipientMatches.length - 1)
+      : (recipientActive + change + recipientMatches.length) % recipientMatches.length;
+    renderRecipientSuggestions();
+    $("chequeRecipientOption" + recipientActive)?.scrollIntoView({ block: "nearest" });
+  } else if (event.key === "Enter" && recipientOpen && recipientActive >= 0) {
+    event.preventDefault();
+    selectRecipient(recipientActive);
+  }
 });
 
 document.addEventListener("click", async (event) => {
+  const option = event.target.closest("[data-recipient-index]");
+  if (option) { selectRecipient(Number(option.dataset.recipientIndex)); return; }
+  if (event.target.closest("[data-recipient-more]")) { await loadRecipients(); return; }
+  if (!event.target.closest(".bank-recipient-field")) {
+    recipientOpen = false;
+    renderRecipientSuggestions();
+  }
   const pageButton = event.target.closest("[data-cheque-page]");
   if (pageButton && !busy) {
     const [direction, step] = pageButton.dataset.chequePage.split("-");
