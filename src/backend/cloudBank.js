@@ -46,3 +46,27 @@ export const loadBankCheques = (incomingOffset = 0, outgoingOffset = 0) =>
 export const bankIssueCheque = (username, amount) => rpc("bank_issue_cheque", { p_recipient_username: username, p_amount: amount });
 export const bankCashCheque = (id) => rpc("bank_cash_cheque", { p_cheque_id: id });
 export const bankCancelCheque = (id) => rpc("bank_cancel_cheque", { p_cheque_id: id });
+
+// Search the same public player directory used by private messages. Pages keep
+// the picker usable even when the player list grows large.
+export async function searchChequeRecipients(query = "", offset = 0) {
+  const { data: { session }, error: sessionError } = await supabase.auth.getSession();
+  if (sessionError || !session?.user) return { data: null, error: normalise(sessionError || new Error("unauthenticated")) };
+  const pageSize = 40;
+  const pageOffset = Math.max(0, Math.floor(Number(offset) || 0));
+  const text = String(query).trim();
+  let request = supabase.from("players")
+    .select("id, username")
+    .not("username", "is", null)
+    .order("username", { ascending: true })
+    .range(pageOffset, pageOffset + pageSize);
+  if (text) request = request.ilike("username", `%${text}%`);
+  const { data, error } = await request;
+  if (error) return { data: null, error: normalise(error) };
+  const page = data || [];
+  return { data: {
+    players: page.slice(0, pageSize).filter((player) => player.id !== session.user.id && player.username),
+    hasMore: page.length > pageSize,
+    nextOffset: pageOffset + pageSize
+  }, error: null };
+}
