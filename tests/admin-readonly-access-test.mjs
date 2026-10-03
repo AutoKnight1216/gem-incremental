@@ -15,7 +15,8 @@ for (const action of ["search", "inspect", "audit", "analytics", "market_fee_ana
 }
 assert.match(edge, /!canWriteAdmin && !READ_ONLY_ACTIONS\.has\(action\)/);
 assert.match(edge, /error: "admin_read_only"/);
-assert.match(edge, /canWrite, access: canWrite \? "owner" : "read_only"/);
+assert.match(edge, /adminId === OWNER_ADMIN_ID \? "owner" : "editor"/);
+assert.match(edge, /const access = canWrite \?/);
 assert.match(edge, /\.from\("admin_viewers"\)/);
 
 assert.match(migration, /bddf7c33-e69c-44e5-98db-3bcc10e582ba/);

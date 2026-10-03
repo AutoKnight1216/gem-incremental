@@ -15,13 +15,12 @@ const READ_ONLY_ACTIONS = new Set([
   "museum_analytics"
 ]);
 
-// Admins are stored in the public.admins table so membership can change
-// without a function redeploy. The owner UUID is retained as a bootstrap
-// fallback in case a fresh project has not seeded the table yet.
-async function isAdmin(ctx: any, id: string | undefined) {
-  if (!id) return false;
+// public.admins grants edit access; admin_viewers grants panel access only.
+// The owner UUID remains a bootstrap fallback for a fresh project.
+async function adminAccess(ctx: any, id: string | undefined) {
+  if (!id) return { isAdmin: false, canWrite: false };
 
-  if (id === OWNER_ADMIN_ID) return true;
+  if (id === OWNER_ADMIN_ID) return { isAdmin: true, canWrite: true };
 
   const { data, error } = await ctx.supabaseAdmin
     .from("admins")
@@ -31,10 +30,10 @@ async function isAdmin(ctx: any, id: string | undefined) {
 
   if (error) {
     console.error("Admin lookup failed:", error);
-    return false;
+    return { isAdmin: false, canWrite: false };
   }
 
-  if (data?.user_id === id) return true;
+  if (data?.user_id === id) return { isAdmin: true, canWrite: true };
 
   const { data: viewer, error: viewerError } = await ctx.supabaseAdmin
     .from("admin_viewers")
@@ -44,10 +43,10 @@ async function isAdmin(ctx: any, id: string | undefined) {
 
   if (viewerError) {
     console.error("Read-only admin lookup failed:", viewerError);
-    return false;
+    return { isAdmin: false, canWrite: false };
   }
 
-  return viewer?.user_id === id;
+  return { isAdmin: viewer?.user_id === id, canWrite: false };
 }
 
 const GEM_CATALOG = [
@@ -255,17 +254,16 @@ export default {
       // Any authenticated user may ask whether they are an admin, so
       // the client can gate its UI without knowing any admin id.
       if (action === "whoami") {
-        const admin = await isAdmin(ctx, adminId);
-        const canWrite = admin && adminId === OWNER_ADMIN_ID;
-        return response({ isAdmin: admin, canWrite, access: canWrite ? "owner" : "read_only" });
+        const { isAdmin, canWrite } = await adminAccess(ctx, adminId);
+        const access = canWrite ? (adminId === OWNER_ADMIN_ID ? "owner" : "editor") : "read_only";
+        return response({ isAdmin, canWrite, access });
       }
 
-      const admin = await isAdmin(ctx, adminId);
-      if (!admin) {
+      const { isAdmin, canWrite: canWriteAdmin } = await adminAccess(ctx, adminId);
+      if (!isAdmin) {
         return response({ error: "admin_forbidden" }, 403);
       }
 
-      const canWriteAdmin = adminId === OWNER_ADMIN_ID;
       if (!canWriteAdmin && !READ_ONLY_ACTIONS.has(action)) {
         return response({
           error: "admin_read_only",
