@@ -1,0 +1,65 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <meta name="color-scheme" content="dark light">
+  <meta name="theme-color" content="#0b0e14">
+  <meta name="description" content="Permanent cosmetic Store for Gem Incremental.">
+  <title>Store · Gem Incremental</title>
+  <link rel="icon" href="/src/assets/favicon.ico">
+  <link rel="stylesheet" href="/src/styles/app.css">
+  <link rel="stylesheet" href="/store/store.css">
+</head>
+<body>
+  <main class="app-main store-page">
+    <section class="store-hero">
+      <div>
+        <span class="store-kicker">COSMETIC STORE</span>
+        <h1>Make the mine yours.</h1>
+        <p>Titles and themes change how Gem Incremental looks—not how it plays.</p>
+        <div class="store-rules" aria-label="Facet rules"><span>No gameplay advantages</span><span>Account-bound</span><span>Non-tradable</span></div>
+      </div>
+      <aside class="facet-wallet card" aria-label="Facet wallet">
+        <span>YOUR BALANCE</span>
+        <strong id="facetBalance">— Facets</strong>
+        <small id="facetEquivalent">100 Facets = S$1.00</small>
+        <button class="btn btn--primary" type="button" id="buyFacetsButton">Get Facets</button>
+      </aside>
+    </section>
+
+    <nav class="store-tabs" id="storeTabs" aria-label="Store sections"></nav>
+    <p class="store-status" id="storeStatus" role="status" aria-live="polite"></p>
+    <section id="storeContent" aria-live="polite"></section>
+
+    <section class="store-promise card">
+      <strong>Cosmetic-only, always.</strong>
+      <p>Facets cannot be gifted, traded, marketed, converted to cash or gameplay currencies, or used to buy an advantage. Default and unequip options stay free.</p>
+    </section>
+  </main>
+
+  <dialog class="store-dialog" id="purchaseDialog" aria-labelledby="purchaseDialogTitle">
+    <form method="dialog" id="purchaseForm">
+      <button class="dialog-close" value="cancel" aria-label="Close">×</button>
+      <span class="store-kicker">CONFIRM PURCHASE</span>
+      <h2 id="purchaseDialogTitle">Purchase cosmetic</h2>
+      <div id="purchaseDialogBody"></div>
+      <p id="purchaseDialogStatus" role="status" aria-live="polite"></p>
+      <div class="dialog-actions"><button class="btn" value="cancel">Cancel</button><button class="btn btn--primary" id="confirmPurchase" value="default">Confirm</button></div>
+    </form>
+  </dialog>
+
+  <dialog class="store-dialog facet-dialog" id="facetDialog" aria-labelledby="facetDialogTitle">
+    <form method="dialog">
+      <button class="dialog-close" value="cancel" aria-label="Close">×</button>
+      <span class="store-kicker">FIXED RATE · NO CUSTOM AMOUNTS</span>
+      <h2 id="facetDialogTitle">Get Facets</h2>
+      <p>Buy a fixed pack through Buy Me a Coffee. Paste your one-time claim code into the product question so the verified webhook can credit this account.</p>
+      <div class="claim-code"><span>Your claim code</span><strong id="facetClaimCode">Generate when checkout is configured</strong><button class="btn" type="button" id="generateClaimCode">Generate code</button></div>
+      <div class="facet-packs" id="facetPacks"></div>
+      <small>Facets are account-bound digital cosmetic credit. Supporter/donation recognition is separate from this Store.</small>
+    </form>
+  </dialog>
+  <script type="module" src="/store/store.js"></script>
+</body>
+</html>

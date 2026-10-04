@@ -399,6 +399,77 @@
   }
 }
 
+/* Store roll-card cosmetics decorate the existing result DOM. They do not
+   participate in rolling, timing, inventory or outcome decisions. The large
+   edge motifs intentionally make a paid skin read as a full visual treatment,
+   rather than a quiet tint on the default card. */
+.stage:is([data-roll-card="glitched"],[data-roll-card="celestial"],[data-roll-card="overgrown"]){
+  --skin-primary:#8da2ff;--skin-secondary:#f2ca75;--skin-panel:#0c1027e8;
+  isolation:isolate;min-height:520px;padding:54px clamp(24px,5vw,62px) 34px;border:2px solid var(--skin-primary);border-radius:24px;
+  box-shadow:inset 0 0 0 1px #ffffff2b,inset 0 0 85px color-mix(in srgb,var(--skin-primary) 22%,transparent),0 20px 65px color-mix(in srgb,var(--skin-primary) 18%,transparent);
+}
+.stage:is([data-roll-card="glitched"],[data-roll-card="celestial"],[data-roll-card="overgrown"])::after{
+  content:"";position:absolute;inset:0;z-index:0;pointer-events:none;border-radius:inherit;opacity:.9;
+  filter:drop-shadow(0 0 10px color-mix(in srgb,var(--skin-primary) 70%,transparent));
+  animation:store-skin-radiance 5s ease-in-out infinite alternate;
+}
+.stage:is([data-roll-card="glitched"],[data-roll-card="celestial"],[data-roll-card="overgrown"]) > *{position:relative;z-index:1}
+.stage:is([data-roll-card="glitched"],[data-roll-card="celestial"],[data-roll-card="overgrown"]) .stage__display{min-height:330px;padding:24px;border-radius:18px;background:radial-gradient(circle at 50% 44%,color-mix(in srgb,var(--skin-primary) 16%,transparent),transparent 44%)}
+.stage:is([data-roll-card="glitched"],[data-roll-card="celestial"],[data-roll-card="overgrown"]) .gem-reveal__art{width:122px;height:122px;filter:drop-shadow(0 0 24px color-mix(in srgb,var(--tier,var(--skin-primary)) 70%,transparent))}
+.stage:is([data-roll-card="glitched"],[data-roll-card="celestial"],[data-roll-card="overgrown"]) .gem-reveal__name{font-size:clamp(1.8rem,4vw,2.6rem);text-shadow:0 0 20px color-mix(in srgb,var(--skin-primary) 75%,transparent)}
+.stage:is([data-roll-card="glitched"],[data-roll-card="celestial"],[data-roll-card="overgrown"]) .gem-fact{padding:12px;border-color:color-mix(in srgb,var(--skin-primary) 52%,transparent);background:linear-gradient(145deg,color-mix(in srgb,var(--skin-primary) 14%,transparent),#05070caa);box-shadow:inset 0 0 18px color-mix(in srgb,var(--skin-primary) 8%,transparent),0 0 16px #0005}
+.stage:is([data-roll-card="glitched"],[data-roll-card="celestial"],[data-roll-card="overgrown"]) .gem-reveal__outcome{min-width:min(430px,100%);justify-content:center;padding:10px 18px;border:1px solid color-mix(in srgb,var(--skin-primary) 40%,transparent);border-radius:99px;background:#04060bb8;box-shadow:inset 0 0 18px color-mix(in srgb,var(--skin-primary) 10%,transparent)}
+.stage:is([data-roll-card="glitched"],[data-roll-card="celestial"],[data-roll-card="overgrown"]) .batch-result{position:relative;overflow:hidden;border:1px solid color-mix(in srgb,var(--skin-primary) 66%,transparent);background:linear-gradient(145deg,color-mix(in srgb,var(--skin-primary) 18%,transparent),#060910e8);box-shadow:inset 0 0 22px color-mix(in srgb,var(--skin-primary) 12%,transparent),0 8px 22px #0007}
+.stage:is([data-roll-card="glitched"],[data-roll-card="celestial"],[data-roll-card="overgrown"]) .batch-result::after{content:"";position:absolute;inset:0;pointer-events:none;border-top:2px solid color-mix(in srgb,var(--skin-secondary) 64%,transparent);clip-path:polygon(0 0,35% 0,28% 7%,75% 0,100% 0,100% 100%,0 100%)}
+
+.stage[data-roll-card="glitched"]{
+  --skin-primary:#45f2e0;--skin-secondary:#ff4f9a;--skin-panel:#07171a;
+  border-color:#42e9dc;
+  background:radial-gradient(ellipse at 14% 16%,#0c414b8a,transparent 31%),radial-gradient(ellipse at 86% 78%,#52132e75,transparent 34%),linear-gradient(118deg,#02090e 0 37%,#100a15 37.3% 68%,#041419 68.3% 100%);
+  box-shadow:inset 7px 0 0 #43f2df1d,inset -7px 0 0 #ff4f981d,inset 0 0 72px #32e8dc18,0 18px 58px #0009;
+}
+.stage[data-roll-card="glitched"]::after{
+  background:linear-gradient(90deg,#45f2e0,transparent) 0 8%/34% 3px no-repeat,linear-gradient(90deg,transparent,#ff4f9a) 100% 18%/28% 4px no-repeat,linear-gradient(90deg,#ff4f9a,transparent) 0 78%/24% 5px no-repeat,linear-gradient(90deg,transparent,#45f2e0) 100% 91%/39% 3px no-repeat,linear-gradient(180deg,#45f2e0,transparent) 3% 0/3px 31% no-repeat,linear-gradient(0deg,#ff4f9a,transparent) 96% 100%/4px 36% no-repeat,conic-gradient(from 42deg at 0 0,#45f2e0 0 10deg,#08171a 11deg 25deg,#ff4f9a 26deg 35deg,transparent 36deg),conic-gradient(from 218deg at 100% 100%,#ff4f9a 0 11deg,#08171a 12deg 27deg,#45f2e0 28deg 38deg,transparent 39deg);
+}
+.stage[data-roll-card="glitched"] .stage__display{
+  border:1px solid #44efdf78;
+  border-radius:5px;
+  background:linear-gradient(90deg,#45f2e00d 0 2%,transparent 2.2% 67%,#ff4f980d 67.2%),linear-gradient(145deg,#03090ecf,#100914d9);
+  box-shadow:-6px 0 #45f2e021,6px 0 #ff4f9821,inset 0 0 45px #0008;
+  clip-path:polygon(0 0,96% 0,100% 7%,100% 100%,4% 100%,0 93%);
+}
+.stage[data-roll-card="glitched"] .gem-reveal__name{text-shadow:-3px 0 #ff4388,3px 0 #43eaff,0 0 24px #37f7e099}
+.stage[data-roll-card="glitched"] .gem-fact{border-radius:4px;background:linear-gradient(100deg,#43eadf12,#05070cca 48%,#ff4f9812)}
+.stage[data-roll-card="glitched"] .batch-result{border-radius:5px;background:linear-gradient(105deg,#43eadf13,#05080ee8 52%,#ff4f9813)}
+.stage[data-roll-card="glitched"] .batch-result:nth-child(odd){transform:translate(-2px,-2px);box-shadow:2px 0 #ff4f9852,-2px 0 #45f2e052,0 8px 22px #0007}
+
+.stage[data-roll-card="celestial"]{--skin-primary:#a874ff;--skin-secondary:#ffd77b;--skin-panel:#0d0823;background:radial-gradient(circle at 18% 22%,#fff 0 1px,transparent 2px),radial-gradient(circle at 78% 27%,#d8c4ff 0 1px,transparent 2px),radial-gradient(circle at 61% 76%,#fff 0 1px,transparent 2px),repeating-radial-gradient(circle at 50% 43%,transparent 0 54px,#9c72ff16 55px 56px),radial-gradient(circle at 50% 43%,#43226c66,transparent 38%),linear-gradient(145deg,#070312,#160725 58%,#090318)}
+.stage[data-roll-card="celestial"]::after{background:linear-gradient(135deg,#b26cff 0 12%,transparent 12.3%) 0 0/26% 38% no-repeat,linear-gradient(225deg,#ffd77b 0 10%,#8d49e9 10.4% 19%,transparent 19.4%) 100% 0/29% 42% no-repeat,linear-gradient(45deg,#8d49e9 0 13%,transparent 13.4%) 0 100%/30% 39% no-repeat,linear-gradient(315deg,#ffd77b 0 8%,#a85cf3 8.4% 19%,transparent 19.4%) 100% 100%/30% 43% no-repeat,linear-gradient(25deg,transparent 49.7%,#b997ff35 50%,transparent 50.3%)}
+.stage[data-roll-card="celestial"] .stage__display::after{content:"";position:absolute;right:5%;top:13%;width:115px;height:115px;border:1px solid #bd88ff77;border-radius:50%;background:radial-gradient(circle at 32% 28%,#8855b9,#210c3e 34%,#050109 68%);box-shadow:inset -18px -12px 30px #000,0 0 32px #9a52ff73;opacity:.55;pointer-events:none}
+
+.stage[data-roll-card="overgrown"]{
+  --skin-primary:#82d47a;--skin-secondary:#e3b56b;--skin-panel:#0d170e;
+  border-color:#719d68;
+  background:radial-gradient(ellipse at 50% 37%,#29492d61,transparent 39%),linear-gradient(145deg,#09110a,#172019 58%,#0b130c);
+  box-shadow:inset 0 0 0 1px #d9eccb18,inset 0 0 75px #45664124,0 20px 58px #0008;
+}
+.stage[data-roll-card="overgrown"]::after{
+  z-index:2;
+  opacity:1;
+  filter:drop-shadow(0 0 8px #8fbd756b);
+  background:url("/src/assets/overgrown-leaf-cluster.svg") left -4px top 62px/168px 108px no-repeat,url("/src/assets/overgrown-leaf-cluster.svg") right -4px top 62px/148px 96px no-repeat,url("/src/assets/overgrown-leaf-cluster.svg") left -4px bottom 22px/148px 96px no-repeat,url("/src/assets/overgrown-leaf-cluster.svg") right -4px bottom 22px/168px 108px no-repeat,linear-gradient(105deg,transparent 0 48%,#789b6670 48.4% 49%,transparent 49.4%) 0 0/24% 29% no-repeat,linear-gradient(255deg,transparent 0 48%,#789b6668 48.4% 49%,transparent 49.4%) 100% 100%/26% 31% no-repeat,linear-gradient(90deg,#6d8e5c,transparent) 0 0/31% 2px no-repeat,linear-gradient(270deg,#6d8e5c,transparent) 100% 100%/35% 2px no-repeat;
+}
+.stage[data-roll-card="overgrown"] .stage__display{
+  border:1px solid #789d6b75;
+  background:radial-gradient(circle at 50% 42%,#2a422b52,transparent 37%),linear-gradient(145deg,#0a110bcf,#101712e8);
+  box-shadow:inset 0 0 38px #0007,0 0 0 5px #31462e26;
+}
+.stage[data-roll-card="overgrown"] .gem-fact,.stage[data-roll-card="overgrown"] .batch-result{border-color:#6f9564;border-bottom:2px solid #9bbd7f;background:linear-gradient(145deg,#2333228f,#080d09df);box-shadow:inset 0 -7px 14px #66815a1f,0 8px 22px #0007}
+@keyframes store-skin-radiance{from{opacity:.72;filter:drop-shadow(0 0 6px color-mix(in srgb,var(--skin-primary) 55%,transparent))}to{opacity:1;filter:drop-shadow(0 0 15px color-mix(in srgb,var(--skin-primary) 78%,transparent))}}
+.stage[data-roll-card="retro-desktop"]{padding:5px;border:3px outset color-mix(in srgb,var(--surface-raised) 75%,#aaa);border-radius:0;background:#198d8d;box-shadow:10px 10px 0 #0005;font-family:Tahoma,"MS Sans Serif",Arial,sans-serif}.stage[data-roll-card="retro-desktop"]:before{content:"gemincremental.exe";display:block;margin-bottom:0;padding:6px 8px;color:#fff;background:linear-gradient(90deg,#071c75,#2f74c9);font-size:.75rem;font-weight:800;letter-spacing:0}.stage[data-roll-card="retro-desktop"] .stage__display{margin:0;padding:18px;border:2px inset color-mix(in srgb,var(--surface-raised) 75%,#aaa);background:var(--surface-solid)}.stage[data-roll-card="retro-desktop"] .stage__controls{padding:12px;background:color-mix(in srgb,var(--surface-raised) 82%,#c7c7c7)}.stage[data-roll-card="retro-desktop"] .roll-button,.stage[data-roll-card="retro-desktop"] .gem-fact{border:2px outset color-mix(in srgb,var(--surface-raised) 70%,#bcbcbc);border-radius:0;box-shadow:none}.stage[data-roll-card="retro-desktop"] .batch-results__grid{grid-template-columns:repeat(2,minmax(0,1fr))}.stage[data-roll-card="retro-desktop"] .batch-result{position:relative;padding-top:30px;border:2px outset color-mix(in srgb,var(--surface-raised) 75%,#aaa);border-radius:0;background:var(--surface-raised);box-shadow:5px 5px 0 #0004}.stage[data-roll-card="retro-desktop"] .batch-result:before{content:"roll-result.exe";position:absolute;inset:2px 2px auto;padding:3px 5px;color:#fff;background:linear-gradient(90deg,#071c75,#2f74c9);font-size:.58rem;font-weight:800}.stage[data-roll-card="retro-desktop"] .batch-result__outcome{margin-top:4px;padding:3px;border:1px inset var(--border);background:var(--surface-sunken)}
+@media(max-width:560px){.stage[data-roll-card="retro-desktop"] .batch-results__grid{grid-template-columns:1fr}.stage[data-roll-card="retro-desktop"]{box-shadow:5px 5px 0 #0004}.stage:is([data-roll-card="glitched"],[data-roll-card="celestial"],[data-roll-card="overgrown"]){min-height:470px;padding:42px 14px 24px;border-radius:18px}.stage:is([data-roll-card="glitched"],[data-roll-card="celestial"],[data-roll-card="overgrown"])::after{opacity:.62}.stage[data-roll-card="celestial"] .stage__display::after{right:-8%;opacity:.32}.stage:is([data-roll-card="glitched"],[data-roll-card="celestial"],[data-roll-card="overgrown"]) .gem-reveal__outcome{min-width:0}}
+@media(prefers-reduced-motion:reduce){.stage:is([data-roll-card="glitched"],[data-roll-card="celestial"],[data-roll-card="overgrown"])::after{animation:none}}
+
 .batch-results {
   position: relative;
   z-index: 2;

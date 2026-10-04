@@ -101,7 +101,9 @@ let activeLeaderboard =
 let avatarMap = {};
 let showcaseMap = {};
 let profileIdMap = {};
+let leaderboardSkinMap = {};
 let impossibleWorldFirstId = null;
+const leaderboardSkinStyles = new Set(['glitched', 'celestial', 'overgrown']);
 
 function showcasePins(username) {
   return showcasePinsHtml(showcaseMap[username]);
@@ -204,7 +206,9 @@ async function loadAvatars() {
     "bestRoll",
     "mostWeight",
     "rawRareRoll",
-    "baseLuck"
+    "baseLuck",
+    "museumPrestige",
+    "achievementPoints"
   ]) {
     for (const player of leaderboardData[key]) {
       if (player.username) {
@@ -217,6 +221,7 @@ async function loadAvatars() {
     avatarMap = {};
     showcaseMap = {};
     profileIdMap = {};
+    leaderboardSkinMap = {};
     return;
   }
 
@@ -259,6 +264,25 @@ async function loadAvatars() {
       ? profileResult.data
       : {};
   impossibleWorldFirstId = impossibleResult.error ? null : impossibleResult.data?.player_id ?? null;
+
+  const userIds = [...new Set(Object.values(profileIdMap).filter(Boolean))];
+  if (userIds.length === 0) {
+    leaderboardSkinMap = {};
+    return;
+  }
+
+  const { data: publicCosmetics, error: cosmeticsError } = await supabase.rpc(
+    "get_public_player_titles",
+    { p_user_ids: userIds }
+  );
+
+  leaderboardSkinMap = {};
+  if (!cosmeticsError && publicCosmetics && typeof publicCosmetics === "object") {
+    for (const [username, userId] of Object.entries(profileIdMap)) {
+      const style = publicCosmetics[userId]?.leaderboard_skin?.visual_config?.style;
+      if (leaderboardSkinStyles.has(style)) leaderboardSkinMap[username] = style;
+    }
+  }
 }
 
 
@@ -948,6 +972,11 @@ function wireProfileLinks() {
     "[data-profile-username]"
   );
 
+  const previewStyle = new URLSearchParams(location.search).get('cosmeticPreview');
+  const previewRow = leaderboardSkinStyles.has(previewStyle)
+    ? identities[0]?.closest('.leaderboard-row')
+    : null;
+
   for (const identity of identities) {
     if (identity.closest("a.leaderboard-profile-link")) {
       continue;
@@ -955,15 +984,21 @@ function wireProfileLinks() {
 
     const username = identity.dataset.profileUsername;
     const userId = profileIdMap[username];
+    const row = identity.closest('.leaderboard-row');
+    const skinStyle = row === previewRow ? previewStyle : leaderboardSkinMap[username];
+
+    if (row && leaderboardSkinStyles.has(skinStyle)) {
+      row.dataset.leaderboardSkin = skinStyle;
+      row.title = `${username}'s equipped ${skinStyle} leaderboard skin`;
+    }
 
     if (!userId) {
       continue;
     }
 
     if (userId === impossibleWorldFirstId) {
-      const row = identity.closest('.leaderboard-row');
       row?.classList.add('leaderboard-row--impossible');
-      if (row) row.title = 'Impossible — World First · awarded to first Impossible Pickaxe crafter';
+      if (row && !row.dataset.leaderboardSkin) row.title = 'Impossible — World First · awarded to first Impossible Pickaxe crafter';
       const label = document.createElement('span');
       label.className = 'impossible-world-first-label';
       label.innerHTML = '<span aria-hidden="true">♔</span><span>WORLD FIRST</span>';
