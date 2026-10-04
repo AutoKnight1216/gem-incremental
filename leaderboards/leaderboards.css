@@ -40,6 +40,9 @@
 .leaderboard-card h2 {
   margin-bottom: var(--space-1);
 }
+.leaderboard-card[data-leaderboard-skin="glitched"]{border-color:#4be4d46b;background:repeating-linear-gradient(90deg,transparent 0 38px,#39e9f80b 39px 40px),linear-gradient(145deg,#091218,#160d1d);box-shadow:inset 3px 0 #42eaff55,inset -3px 0 #ff438155}.leaderboard-card[data-leaderboard-skin="glitched"] .leaderboard-row:nth-child(3n+1){text-shadow:-1px 0 #ff4381,1px 0 #42eaff}
+.leaderboard-card[data-leaderboard-skin="celestial"]{border-color:#8195ff66;background:radial-gradient(circle at 11% 13%,#fff 0 1px,transparent 2px),radial-gradient(circle at 78% 24%,#a8b5ff 0 1px,transparent 2px),linear-gradient(145deg,#080d22,#171a3d);box-shadow:inset 0 0 42px #8195ff20}.leaderboard-card[data-leaderboard-skin="celestial"] .leaderboard-row:nth-child(even){background:#121735bb}
+.leaderboard-card[data-leaderboard-skin="overgrown"]{border-color:#6b895c77;background:linear-gradient(112deg,transparent 48%,#73955f2d 49%,transparent 50%),radial-gradient(ellipse at bottom,#5362475e,transparent 58%),linear-gradient(145deg,#131c15,#252c21);box-shadow:inset 0 -18px 28px #6f92552b}.leaderboard-card[data-leaderboard-skin="overgrown"] .leaderboard-row:nth-child(even){background:#1a251acc}
 
 .leaderboard-title-row {
   margin-bottom: var(--space-4);

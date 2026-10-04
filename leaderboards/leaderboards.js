@@ -14,6 +14,7 @@ import gems from "../src/data/gems.js";
 import { loadShowcasesFor } from "../src/backend/cloudShowcase.js";
 import { showcasePinsHtml } from "../src/ui/showcaseRender.js";
 import { roleForUsername, roleBadgeHtml } from "../src/ui/roles.js";
+import { mountEquippedLeaderboardSkin } from "../src/ui/equippedCosmetics.js";
 
 let liveMutationCatalog = Object.fromEntries(
   Object.values(GEM_MUTATIONS).map((mutation) => [mutation.id, mutation])
@@ -1319,5 +1320,6 @@ async function startLeaderboards() {
 
 
 startLeaderboards();
+mountEquippedLeaderboardSkin();
 
 achievementPointsTab.addEventListener("click", () => { activeLeaderboard = "achievementPoints"; renderLeaderboard(); });

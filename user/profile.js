@@ -1,5 +1,4 @@
 import { cosmeticHtml, cosmeticStyle } from '../src/ui/cosmetics.js';
-import { openCustomizer } from './customize.js';
 import { supabase } from "../src/backend/supabase.js";
 import { mountShell } from "../src/ui/shell.js";
 import { gemNameHtml, gemIconHtml } from "../src/ui/gemStyle.js";
@@ -154,7 +153,10 @@ function renderHero(profile) {
   const role = roleForId(profile.id);
 
   const cosmetics = profile.cosmetics || {};
-  const backgroundStyle = cosmetics.background ? cosmeticStyle(cosmetics.background) : 'default';
+  const previewStyle = new URLSearchParams(location.search).get('cosmeticPreview');
+  const allowedPreview = ['glitched','celestial','overgrown'].includes(previewStyle) ? previewStyle : null;
+  const backgroundStyle = allowedPreview || (cosmetics.background ? cosmeticStyle(cosmetics.background) : 'default');
+  const collectibleTitle = allowedPreview ? { name:`[${allowedPreview.toUpperCase()}]`, rarity:'Epic', description:'Cosmetic Store preview', visual_config:{ style:allowedPreview, icon:allowedPreview === 'celestial' ? '✦' : allowedPreview === 'overgrown' ? '❧' : '⌁' } } : cosmetics.title;
   profileHero.dataset.background = backgroundStyle;
   const profilePage = document.querySelector('.profile-page');
   profilePage.dataset.decor = cosmetics.decor ? cosmeticStyle(cosmetics.decor) : 'none';
@@ -176,10 +178,10 @@ function renderHero(profile) {
         ${profile.title ? `<span class="player-title-badge player-title-badge--profile" style="--player-title-color:${escapeHtml(/^#[0-9a-f]{6}$/i.test(String(profile.title_color ?? "")) ? profile.title_color : "#ffd166")}">${escapeHtml(profile.title)}</span>` : ""}
       </h1>
 
-      <div class="profile-collectible-title">${cosmeticHtml(cosmetics.title)}</div>
+      <div class="profile-collectible-title">${cosmeticHtml(collectibleTitle)}</div>
       <div class="profile-badges" aria-label="Equipped badges">${(cosmetics.badges || []).slice(0,3).map(item => cosmeticHtml(item)).join('')}</div>
       <p class="profile-joined">${profile.created_at ? `Joined ${escapeHtml(new Date(profile.created_at).toLocaleDateString('en-US', { month:'long', year:'numeric' }))}` : ''}</p>
-      <div class="profile-actions"><button class="btn" id="copyPlayerId">Copy Player ID</button><button class="btn btn--primary" id="customizeProfile" hidden>Customize Profile</button></div>
+      <div class="profile-actions"><button class="btn" id="copyPlayerId">Copy Player ID</button><a class="btn btn--primary" id="customizeProfile" href="/store/?tab=my-cosmetics" hidden>Customize in Store</a></div>
       <span id="profileActionStatus" role="status" aria-live="polite"></span>
     </div>
   `;
@@ -256,7 +258,12 @@ function renderNotFound(message) {
 
 
 async function loadProfile() {
-  const profileId = getProfileIdFromPath();
+  let profileId = getProfileIdFromPath();
+
+  if (!profileId) {
+    const { data: sessionData } = await supabase.auth.getSession();
+    profileId = sessionData?.session?.user?.id || profileId;
+  }
 
   if (!isUuid(profileId)) {
     renderNotFound("The player ID in this URL is not valid.");
@@ -293,7 +300,6 @@ async function loadProfile() {
   if (sessionData?.session?.user?.id === profileId && data.cosmetics) {
     const customize = document.getElementById('customizeProfile');
     customize.hidden = false;
-    customize.onclick = () => openCustomizer(loadProfile);
   }
 }
 

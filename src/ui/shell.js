@@ -101,7 +101,8 @@ const PAGES = [
   { id: "research-tree", label: "Research Tree", short: "Research", href: "research-tree/", icon: icons.branch, sectionId: "research-tree" },
   // Client-only page: shown only when the "Global cash graph" device
   // setting is on.
-  { id: "global-cash-graph", label: "Cash Market", short: "Market", href: "global-cash-graph/", icon: icons.chart, settingGated: "cashGraph" }
+  { id: "global-cash-graph", label: "Cash Market", short: "Market", href: "global-cash-graph/", icon: icons.chart, settingGated: "cashGraph" },
+  { id: "store", label: "Store", short: "Store", href: "store/", icon: icons.sparkle }
 ];
 
 const CORE_PAGE_IDS = new Set(["roll", "inventory", "crafting", "boosts", "auctions", "expeditions", "minigames"]);
@@ -179,6 +180,13 @@ const EXPLORE_GROUPS = [
     label: "Labs & Economy",
     icon: icons.flask || icons.coins,
     pageIds: ["workbench", "bank", "lottery", "gem-fusion", "enchanting-lab", "merchant-caravan", "global-cash-graph"]
+  },
+  {
+    id: "store",
+    label: "Store",
+    icon: icons.sparkle,
+    pageIds: ["store"],
+    direct: true
   },
   {
     id: "admin",
@@ -1820,6 +1828,10 @@ function renderExploreGroups(items, activePage, base) {
     const groupItems = items.filter((item) => exploreGroupFor(item)?.id === group.id);
     const active = groupItems.some((item) => item.id === activePage || item.match?.includes(activePage));
     const open = active || (group.defaultOpen && !hasActiveGroup);
+
+    if (group.direct) {
+      return groupItems.map((item) => menuNavLink(item, activePage, base)).join("");
+    }
 
     return `
       <details

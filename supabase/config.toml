@@ -1,0 +1,2 @@
+[functions.bmc-facets-webhook]
+verify_jwt = false

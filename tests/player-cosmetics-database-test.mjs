@@ -90,5 +90,53 @@ await assert.rejects(()=>set({title:'first-light'}),/permission denied/);
 await db.exec('reset role');
 // SECURITY DEFINER endpoints still reject an authenticated DB role without a JWT subject.
 await db.exec('set role authenticated');await assert.rejects(()=>set({}),/Sign in/);
+await db.exec('reset role');
+
+// Facets Store extends the same ownership/loadout authority. PGlite does not
+// ship Supabase's extensions schema, so provide deterministic pgcrypto-shaped
+// helpers for this local behavioral test only.
+await db.exec(`alter role service_role bypassrls; create schema extensions;
+create function extensions.gen_random_bytes(n integer) returns bytea language sql volatile as $$select decode(substr(repeat(md5(random()::text),8),1,n*2),'hex')$$;
+create function extensions.digest(value bytea, algorithm text) returns bytea language sql immutable as $$select decode(md5(encode(value,'hex')),'hex')$$;
+grant usage on schema extensions to authenticated,service_role; grant execute on all functions in schema extensions to authenticated,service_role;`);
+await db.exec(read('../supabase/migrations/20261004030718_facets_store_v1.sql'));
+assert.equal(await value("select count(*)::int result from cosmetic_store_items where enabled"),15);
+assert.equal(await value("select sum(facet_price)::int result from cosmetic_store_items where collection_id='glitched'"),800);
+await db.query('insert into facet_wallets(player_id,balance) values($1,2000)',[uid]);
+await db.query("select set_config('request.jwt.claim.sub',$1,false)",[uid]);
+await db.exec('set role authenticated');
+const requestOne='10000000-0000-4000-8000-000000000001';
+const itemPurchase=await value("select purchase_cosmetic_store_item('item','glitched-title',$1) result",[requestOne]);
+assert.equal(itemPurchase.price,100);assert.equal(itemPurchase.balance_after,1900);
+const duplicate=await value("select purchase_cosmetic_store_item('item','glitched-title',$1) result",[requestOne]);
+assert.equal(duplicate.duplicate,true);assert.equal(duplicate.balance_after,1900);
+const bundle=await value("select purchase_cosmetic_store_item('collection','glitched',$1) result",['10000000-0000-4000-8000-000000000002']);
+assert.equal(bundle.price,525,'25% discount applies to the remaining 700 Facets');
+assert.equal(bundle.balance_after,1375);assert.equal((await owns('glitched-roll-card')),true);
+await set({title:'glitched-title',background:'glitched-background',roll_card:'glitched-roll-card',leaderboard_skin:'glitched-leaderboard-skin'});
+const storeLoadout=await value('select get_my_cosmetics() result');
+assert.equal(storeLoadout.resolved.roll_card.id,'glitched-roll-card');assert.equal(storeLoadout.resolved.leaderboard_skin.id,'glitched-leaderboard-skin');
+await db.query("select set_config('request.jwt.claim.sub',$1,false)",[other]);
+await assert.rejects(()=>value("select purchase_cosmetic_store_item('item','retro-desktop-roll-card',$1) result",['10000000-0000-4000-8000-000000000003']),/Not enough|already own/i);
+await assert.rejects(()=>db.query('insert into facet_wallets(player_id,balance) values($1,999)',[other]),/permission denied/);
+await db.query("select set_config('request.jwt.claim.sub',$1,false)",[uid]);
+const claim=await value('select create_facet_claim_code() result');
+await db.exec('reset role');
+assert.equal(await value("select exists(select 1 from facet_claim_codes where code=$1 and consumed_at is null) result",[claim.code]),true,'generated claim code is verifiable');
+await db.exec("update facet_pack_definitions set provider_product_id='101',checkout_url='https://example.test/100' where id='facets-100'");
+const created={event_id:9001,type:'extra_purchase.created',live_mode:true,created:1,attempt:1,data:{transaction_id:'txn-store-1',status:'succeeded',refunded:'false',amount:1,currency:'SGD',extras:[{id:101,quantity:1,question_answers:[claim.code]}]}};
+assert.equal(await value("select exists(select 1 from facet_claim_codes c,jsonb_array_elements(($1::jsonb)->'data'->'extras') e(value),jsonb_array_elements(e.value->'question_answers') a(value) where c.code=upper(trim(both '\"' from a.value::text))) result",[JSON.stringify(created)]),true,'claim code is found inside the BMC payload');
+assert.equal(await value("select exists(select 1 from facet_claim_codes c where c.code=upper(trim($1)) and c.consumed_at is null and c.expires_at>now()) result",[claim.code]),true,'service can resolve the active claim code');
+const claimRow=(await db.query('select id,player_id from facet_claim_codes where code=$1',[claim.code])).rows[0];
+await db.query("update facet_claim_codes set consumed_at=now(),consumed_transaction_id='txn-store-1' where id=$1",[claimRow.id]);
+const credit=await value('select process_bmc_facet_event($1::jsonb,$2::uuid,$3::uuid) result',[JSON.stringify(created),claimRow.id,claimRow.player_id]);
+assert.equal(credit.credited,100);assert.equal(credit.balance,1475);
+const retried={...created,event_id:9002};
+assert.equal((await value('select process_bmc_facet_event($1::jsonb,null,null) result',[JSON.stringify(retried)])).duplicate,true,'transaction retry is idempotent');
+const refunded={...created,event_id:9003,type:'extra_purchase.refunded',data:{...created.data,status:'refunded',refunded:'true'}};
+const debit=await value('select process_bmc_facet_event($1::jsonb,null,null) result',[JSON.stringify(refunded)]);
+assert.equal(debit.debited,100);assert.equal(debit.balance,1375);
+assert.equal(await value("select count(*)::int result from facet_ledger where source_ref='txn-store-1'"),2);
+await db.exec('reset role');
 await db.close();
-console.log('Cosmetics migration: backfills, reward bridges, RLS, equipment validation, role separation and public resolution passed.');
+console.log('Cosmetics + Facets Store: backfills, RLS, loadouts, pricing, idempotent credit and refund passed.');

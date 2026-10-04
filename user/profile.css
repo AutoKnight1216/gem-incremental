@@ -416,6 +416,14 @@
 .profile-hero { min-height: 265px; padding: 32px; }
 .profile-hero__identity { min-width: 0; }
 .profile-collectible-title .cosmetic { font-size: 1rem; margin: 4px 0 10px; }
+.cosmetic--glitched { color:#bafff4; border-color:#4fe5d7; background:linear-gradient(90deg,#ff3c8114,#37e7ef18); text-shadow:-1px 0 #ff4d91,1px 0 #43e8ff; }
+.cosmetic--celestial { color:#e4e8ff; border-color:#879cff; background:radial-gradient(circle at 15% 25%,#fff 0 1px,transparent 2px),linear-gradient(120deg,#17204b,#0b1027); box-shadow:inset 0 0 18px #718dff26; }
+.cosmetic--overgrown { color:#cbe9b8; border-color:#66885c; background:linear-gradient(120deg,#30442e,#151f17); box-shadow:inset 0 -5px 12px #75a15b1f; }
+.cosmetic--gambler { color:#f6d17a; border-color:#c49b3f; background:#35110d; }
+.cosmetic--quit99 { color:#ffad91; border-color:#9f5e4b; background:#252a31; }
+.profile-hero[data-background="glitched"]{background:repeating-linear-gradient(90deg,transparent 0 39px,#30ecff0b 40px 41px),radial-gradient(circle at 15% 18%,#ff3d7e24,transparent 35%),linear-gradient(135deg,#0a1218,#170d20);box-shadow:inset 3px 0 #46efff66,inset -3px 0 #ff4d8b55}
+.profile-hero[data-background="celestial"]{background:radial-gradient(circle at 12% 20%,#fff 0 1px,transparent 2px),radial-gradient(circle at 73% 28%,#9dadff 0 1px,transparent 2px),radial-gradient(circle at 40% 82%,#fff 0 1px,transparent 2px),linear-gradient(145deg,#080d22,#171a3d);box-shadow:inset 0 0 45px #7f95ff20}
+.profile-hero[data-background="overgrown"]{background:linear-gradient(112deg,transparent 48%,#7f9f6740 49%,transparent 50%),radial-gradient(ellipse at bottom,#50604666,transparent 56%),linear-gradient(145deg,#151e17,#242b20);box-shadow:inset 0 -18px 25px #6e92562d}
 .profile-badges, .profile-actions { display: flex; flex-wrap: wrap; gap: 8px; margin: 12px 0; }
 .profile-joined, #profileActionStatus { font-size: .8rem; color: var(--text-muted); }
 .profile-stats { margin: 0; gap: 1px; overflow: hidden; border: 1px solid var(--border); border-radius: 18px; background: var(--border); }
