@@ -1,6 +1,6 @@
 # Facets Store visual verification
 
-These captures were taken from the locally running game while signed into the dedicated test account. The theme previews use the same profile, roll-stage and leaderboard renderers as equipped cosmetics; they are not isolated mockups. Leaderboard skins decorate the equipped player's individual row only, while the board around it remains neutral.
+These captures were taken from the locally running game while signed into the dedicated test account. The theme previews use the same profile, roll-stage and leaderboard renderers as equipped cosmetics; they are not isolated mockups. Leaderboard skins decorate the equipped player's individual row only, while the board around it remains neutral. Backgrounds, roll cards and leaderboard skins are visual-only treatments without decorative theme captions; words such as `[GLITCHED]` appear only when the matching title cosmetic is equipped.
 
 ## Store and My Cosmetics
 

@@ -66,18 +66,14 @@
 }
 
 .leaderboard-row:is([data-leaderboard-skin="glitched"],[data-leaderboard-skin="celestial"],[data-leaderboard-skin="overgrown"])::after {
+  content: "";
   position: absolute;
   z-index: 2;
-  inset: 9px 14px auto auto;
-  width: auto;
+  inset: 0;
   opacity: 1;
+  pointer-events: none;
   background: none;
   filter: none;
-  color: var(--row-skin-2);
-  font: 800 0.5rem/1 var(--font-display);
-  letter-spacing: 0.17em;
-  text-transform: uppercase;
-  text-shadow: 0 0 11px currentColor;
 }
 
 .leaderboard-row:is([data-leaderboard-skin="glitched"],[data-leaderboard-skin="celestial"],[data-leaderboard-skin="overgrown"]) > * {
@@ -104,7 +100,6 @@
     linear-gradient(90deg, transparent 0 48%, #43f1df2e 48.2% 49%, transparent 49.2% 71%, #ff4d9630 71.2% 72%, transparent 72.2%);
 }
 
-.leaderboard-row[data-leaderboard-skin="glitched"]::after { content: "GLITCHED // USER"; }
 .leaderboard-row[data-leaderboard-skin="glitched"] .lb-name-text { text-shadow: -1px 0 #ff4381, 1px 0 #42eaff; }
 
 .leaderboard-row[data-leaderboard-skin="celestial"] {
@@ -126,8 +121,6 @@
     linear-gradient(24deg, transparent 49.6%, #b784ff42 50%, transparent 50.4%);
 }
 
-.leaderboard-row[data-leaderboard-skin="celestial"]::after { content: "CELESTIAL // ASCENDANT"; }
-
 .leaderboard-row[data-leaderboard-skin="overgrown"] {
   --row-skin: #82d179;
   --row-skin-2: #edc478;
@@ -144,8 +137,6 @@
     linear-gradient(315deg, #506747 0 19%, transparent 19.5%) 100% 100% / 28% 92% no-repeat,
     repeating-radial-gradient(ellipse at 6% 20%, transparent 0 12px, #79bd6850 13px 15px, transparent 16px 29px);
 }
-
-.leaderboard-row[data-leaderboard-skin="overgrown"]::after { content: "OVERGROWN // DEEP ROOT"; }
 
 @media (max-width: 620px) {
   .leaderboard-row:is([data-leaderboard-skin="glitched"],[data-leaderboard-skin="celestial"],[data-leaderboard-skin="overgrown"]) {

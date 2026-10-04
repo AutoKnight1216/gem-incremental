@@ -20,8 +20,13 @@ assert.match(shell,/id: "store"[\s\S]*href: "store\//);assert.match(shell,/id: "
 const profile=read('../user/profile.js');assert.match(profile,/Customize in Store/);assert.doesNotMatch(profile,/openCustomizer/);
 const rollCss=read('../style.css');
 for(const style of ['glitched','celestial','overgrown','retro-desktop']) assert.ok(rollCss.includes(`data-roll-card="${style}"`));
+const profileCss=read('../user/profile.css');
+for(const decorativeLabel of ['SIGNAL // FRACTURED','CELESTIAL // STARFORGED','OVERGROWN // RECLAIMED','GLITCHED // SIGNAL LOST','CELESTIAL // CONSTELLATION','OVERGROWN // MINE RECLAIMED','GLITCHED // USER','CELESTIAL // ASCENDANT','OVERGROWN // DEEP ROOT']) {
+  assert.ok(!`${rollCss}\n${profileCss}`.includes(decorativeLabel));
+}
 const leaderboardCss=read('../leaderboards/leaderboards.css');
 for(const style of ['glitched','celestial','overgrown']) assert.ok(leaderboardCss.includes(`.leaderboard-row[data-leaderboard-skin="${style}"]`));
+for(const decorativeLabel of ['GLITCHED // USER','CELESTIAL // ASCENDANT','OVERGROWN // DEEP ROOT']) assert.ok(!leaderboardCss.includes(decorativeLabel));
 assert.doesNotMatch(leaderboardCss,/\.leaderboard-card(?:\[[^\]]*\]|:is\([^)]*\))[^\n{]*data-leaderboard-skin/);
 const leaderboardJs=read('../leaderboards/leaderboards.js');
 assert.match(leaderboardJs,/get_public_player_titles/);
