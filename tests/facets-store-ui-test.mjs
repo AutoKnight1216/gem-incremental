@@ -18,6 +18,7 @@ assert.equal(COSMETIC_ITEMS.find(item=>item.id==='retro-desktop-roll-card').pric
 const shell=read('../src/ui/shell.js');
 assert.match(shell,/id: "store"[\s\S]*href: "store\//);assert.match(shell,/id: "store"[\s\S]*direct: true/);
 const profile=read('../user/profile.js');assert.match(profile,/Customize in Store/);assert.doesNotMatch(profile,/openCustomizer/);
+const storeClient=read('../store/store.js');assert.match(storeClient,/mountShell\(\{ page: 'store', base: '\.\.\/' \}\)/);
 const rollCss=read('../style.css');
 for(const style of ['glitched','celestial','overgrown','retro-desktop']) assert.ok(rollCss.includes(`data-roll-card="${style}"`));
 assert.match(rollCss,/data-roll-card="glitched"\] \.stage__display[\s\S]*?clip-path:polygon/);
