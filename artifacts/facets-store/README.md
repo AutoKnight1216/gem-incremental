@@ -1,6 +1,6 @@
 # Facets Store visual verification
 
-These captures were taken from the locally running game while signed into the dedicated test account. The theme previews use the same profile, roll-stage and leaderboard renderers as equipped cosmetics; they are not isolated mockups.
+These captures were taken from the locally running game while signed into the dedicated test account. The theme previews use the same profile, roll-stage and leaderboard renderers as equipped cosmetics; they are not isolated mockups. Leaderboard skins decorate the equipped player's individual row only, while the board around it remains neutral.
 
 ## Store and My Cosmetics
 

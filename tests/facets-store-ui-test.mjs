@@ -21,6 +21,11 @@ const profile=read('../user/profile.js');assert.match(profile,/Customize in Stor
 const rollCss=read('../style.css');
 for(const style of ['glitched','celestial','overgrown','retro-desktop']) assert.ok(rollCss.includes(`data-roll-card="${style}"`));
 const leaderboardCss=read('../leaderboards/leaderboards.css');
-for(const style of ['glitched','celestial','overgrown']) assert.ok(leaderboardCss.includes(`data-leaderboard-skin="${style}"`));
+for(const style of ['glitched','celestial','overgrown']) assert.ok(leaderboardCss.includes(`.leaderboard-row[data-leaderboard-skin="${style}"]`));
+assert.doesNotMatch(leaderboardCss,/\.leaderboard-card(?:\[[^\]]*\]|:is\([^)]*\))[^\n{]*data-leaderboard-skin/);
+const leaderboardJs=read('../leaderboards/leaderboards.js');
+assert.match(leaderboardJs,/get_public_player_titles/);
+assert.match(leaderboardJs,/row\.dataset\.leaderboardSkin = skinStyle/);
+assert.doesNotMatch(leaderboardJs,/mountEquippedLeaderboardSkin/);
 const webhook=read('../supabase/functions/bmc-facets-webhook/index.ts');assert.match(webhook,/x-signature-sha256/);assert.match(webhook,/constantTimeEqual/);assert.match(webhook,/process_bmc_facet_event/);
 console.log('Facet catalogue, upgrade math, navigation, previews and webhook verification wiring passed.');

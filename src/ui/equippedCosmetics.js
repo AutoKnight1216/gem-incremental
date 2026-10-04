@@ -16,17 +16,3 @@ export async function mountEquippedRollCard() {
     if (item && rollStyles.has(style)) stage.dataset.rollCard = style;
   } catch { /* The standard card is the safe fallback. */ }
 }
-
-export async function mountEquippedLeaderboardSkin() {
-  const card = document.getElementById('leaderboardCard');
-  if (!card) return;
-  const preview = new URLSearchParams(location.search).get('cosmeticPreview');
-  if (['glitched','celestial','overgrown'].includes(preview)) { card.dataset.leaderboardSkin = preview; return; }
-  try {
-    const { data, error } = await supabase.rpc('get_my_cosmetics');
-    if (error) return;
-    const item = data?.resolved?.leaderboard_skin;
-    const style = cosmeticStyle(item);
-    if (item && rollStyles.has(style)) card.dataset.leaderboardSkin = style;
-  } catch { /* The standard leaderboard is the safe fallback. */ }
-}
