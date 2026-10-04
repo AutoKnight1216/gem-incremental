@@ -4,7 +4,7 @@ import { ensurePlayerAuth } from '../src/backend/auth.js';
 import { loadCosmeticStore, purchaseCosmetic, createFacetClaimCode, saveCosmeticLoadout } from '../src/backend/cloudCosmeticStore.js';
 import { COSMETIC_COLLECTIONS, COSMETIC_ITEMS, FACET_PACKS, STORE_SECTIONS, collectionUpgradePrice, facetsToSgd, formatFacets } from '../src/data/cosmeticStore.js';
 
-mountShell({ page: 'store' });
+mountShell({ page: 'store', base: '../' });
 
 const tabs = document.getElementById('storeTabs');
 const content = document.getElementById('storeContent');
