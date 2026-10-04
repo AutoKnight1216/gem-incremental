@@ -20,6 +20,10 @@ assert.match(shell,/id: "store"[\s\S]*href: "store\//);assert.match(shell,/id: "
 const profile=read('../user/profile.js');assert.match(profile,/Customize in Store/);assert.doesNotMatch(profile,/openCustomizer/);
 const rollCss=read('../style.css');
 for(const style of ['glitched','celestial','overgrown','retro-desktop']) assert.ok(rollCss.includes(`data-roll-card="${style}"`));
+assert.match(rollCss,/data-roll-card="glitched"\] \.stage__display[\s\S]*?clip-path:polygon/);
+assert.match(rollCss,/data-roll-card="overgrown"\]::after[\s\S]*?overgrown-leaf-cluster\.svg/);
+const overgrownRollCss=rollCss.slice(rollCss.indexOf('.stage[data-roll-card="overgrown"]'),rollCss.indexOf('@keyframes store-skin-radiance'));
+assert.ok(!overgrownRollCss.includes('repeating-radial-gradient'));
 const profileCss=read('../user/profile.css');
 for(const decorativeLabel of ['SIGNAL // FRACTURED','CELESTIAL // STARFORGED','OVERGROWN // RECLAIMED','GLITCHED // SIGNAL LOST','CELESTIAL // CONSTELLATION','OVERGROWN // MINE RECLAIMED','GLITCHED // USER','CELESTIAL // ASCENDANT','OVERGROWN // DEEP ROOT']) {
   assert.ok(!`${rollCss}\n${profileCss}`.includes(decorativeLabel));
