@@ -122,9 +122,9 @@ on conflict (cosmetic_id) do update set shard_price=excluded.shard_price,sort_or
 -- Exotic Potion is a single successful-roll +100,000 Luck charge. It has no
 -- shop, recipe, market value or alternate grant path.
 insert into public.game_consumables(id,name,family,tier,effect_value,duration_seconds,purchasable,shop_price)
-values ('exotic-potion','Exotic Potion','luck',4,100000,null,false,null)
+values ('exotic-potion','Exotic Potion','luck',4,100000,1,false,null)
 on conflict (id) do update set name=excluded.name,family='luck',tier=4,effect_value=100000,
-  duration_seconds=null,purchasable=false,shop_price=null;
+  duration_seconds=1,purchasable=false,shop_price=null;
 
 create or replace function public.activate_one_roll_potion(p_consumable_id text)
 returns jsonb language plpgsql security definer set search_path='' as $$
