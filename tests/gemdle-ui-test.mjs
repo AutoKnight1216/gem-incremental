@@ -16,7 +16,9 @@ export const supabase={auth:{onAuthStateChange(fn){setTimeout(()=>fn('INITIAL_SE
 window.testCalls=(window.testCalls||[]).concat(body);
 if(body.action==='roll'){rolled=true;sessionStorage.setItem('gemdle-test-rolled','yes');}
 const row=${JSON.stringify(row)};
-return {data:body.action==='history'?{history:rolled?[row]:[],next_cursor:null,lifetime_rarity_score:'NaN'}:{gemdle_date:row.gemdle_date,server_now:new Date().toISOString(),resets_at:new Date(Date.now()+3600000).toISOString(),result:rolled?row:null,created:body.action==='roll',lifetime_rarity_score:'NaN',board:{entries:rolled?[{rank:1,username:'<img src=x onerror=alert(1)>',specimen:row.specimen,is_you:true}]:[],own_rank:rolled?1:null,participants:rolled?1:0},lifetime_board:{entries:rolled?[{rank:1,username:'<img src=x onerror=alert(1)>',total_score:row.specimen.overall_rarity,discoveries:1,is_you:true}]:[],own_rank:rolled?1:null,participants:rolled?1:0}}};
+const data=body.action==='history'?{history:rolled?[row]:[],next_cursor:null,lifetime_rarity_score:'NaN'}:{gemdle_date:row.gemdle_date,server_now:new Date().toISOString(),resets_at:new Date(Date.now()+3600000).toISOString(),result:rolled?row:null,created:body.action==='roll',lifetime_rarity_score:'NaN',board:{entries:rolled?[{rank:1,username:'<img src=x onerror=alert(1)>',specimen:row.specimen,is_you:true}]:[],own_rank:rolled?1:null,participants:rolled?1:0},lifetime_board:{entries:rolled?[{rank:1,username:'<img src=x onerror=alert(1)>',total_score:row.specimen.overall_rarity,discoveries:1,is_you:true}]:[],own_rank:rolled?1:null,participants:rolled?1:0}};
+if(window.testMissingLifetimeBoard&&body.action!=='history')delete data.lifetime_board;
+return {data};
 }}};` }));
 await page.goto(process.env.GEMDLE_PREVIEW_URL || 'http://127.0.0.1:5527/gemdle/');
 await page.waitForTimeout(500);
@@ -59,6 +61,10 @@ await page.locator('#lifetime-board-card').scrollIntoViewIfNeeded();
 await page.locator('#lifetime-board-card').screenshot({path:'/tmp/gemdle-mobile-lifetime-board.png'});
 await page.locator('#collection-card').scrollIntoViewIfNeeded();
 await page.locator('#collection-card').screenshot({path:'/tmp/gemdle-mobile-collection.png'});
+await page.evaluate(()=>window.testMissingLifetimeBoard=true);
+await page.locator('#refresh-lifetime').click();
+await page.waitForFunction(()=>document.querySelector('#lifetime-leaderboard')?.textContent?.includes('backend update pending'));
+await page.locator('#lifetime-board-card').screenshot({path:'/tmp/gemdle-lifetime-backend-pending.png'});
 assert.ok(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth));
 assert.deepEqual(errors,[]);
 await browser.close();console.log('PASS: reveal, reload persistence, daily and lifetime ranks, lifetime score, collapsible collection, history dialog, escaped usernames, mobile layout');

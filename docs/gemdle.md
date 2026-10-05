@@ -30,6 +30,7 @@ Prepared for Supabase project `igrddscmrdrrwtvyspbf`. No migration or function w
 - History stores immutable specimen snapshots so future balancing/catalog changes do not rewrite old scores. History is paginated in batches of 30 and retained for the account's lifetime. The collection is collapsible, while its header keeps the lifetime rarity score visible. That score is the sum of every saved specimen's server-authored Overall Rarity. After a new Overall Rarity reveal, a subtle green gain appears and the previous lifetime score counts up to its new total; reduced-motion mode skips the count-up.
 - During a staggered deployment, a missing or non-finite lifetime-score field never renders as `NaN`. The client temporarily calculates the same sum from the authenticated paginated history response until the updated Edge Function is available.
 - The daily board ranks each day's Overall Rarity, while the lifetime board ranks the sum of every saved Overall Rarity and shows each player's discovery count. Equal scores share a rank. Each visible board contains 50 entries, with a separate own-rank lookup. Existing leaderboard-hidden settings and active suspensions are respected. Share text uses the Singapore date rather than inventing a launch-day numbering epoch.
+- The lifetime board normally uses its database RPC. If that migration is temporarily behind the Edge Function during deployment, the Edge Function rebuilds the same board from paginated service-role reads. A frontend still connected to the older Edge Function identifies that deployment mismatch explicitly instead of reporting a generic outage.
 
 ## Security
 
@@ -60,7 +61,7 @@ node tests/gemdle-ui-test.mjs
 
 Validated locally:
 
-- 14 RNG/API/format tests, including lifetime-score and independent-board-outage coverage, 10,000 identical-sequence comparisons with the original weight source, and a 200,000-roll weight-band simulation.
+- 15 RNG/API/format tests, including lifetime-score, RPC-fallback, privacy, and independent-board-outage coverage, 10,000 identical-sequence comparisons with the original weight source, and a 200,000-roll weight-band simulation.
 - All three Gemdle migrations execute; RLS and grants block client writes/service RPCs, compute the lifetime score and leaderboard, preserve duplicate results, honor the SGT date boundary, ties, privacy settings, and own ranks outside the top 50. PGlite serializes database calls, so a real multi-connection race remains a post-deployment smoke check.
 - Desktop/mobile browser reveal, saved-result reload, daily and lifetime leaderboards, collapsible collection, synchronized lifetime score and post-roll count-up, history dialog, escaped usernames and no horizontal overflow; light-theme card contrast visually checked.
 - All 216 currently enabled live catalog entries inspected read-only. Hourly non-event probability averaging gives approximately 24.79% ≥1/10K, 7.42% ≥1/100K, 2.33% ≥1M, 0.533% ≥10M, 0.137% ≥100M, and 0.00301% ≥1B. Event days vary as designed.
