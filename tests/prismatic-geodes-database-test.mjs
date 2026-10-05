@@ -15,7 +15,7 @@ await db.exec(read('./fixtures/cosmetics-live-functions.sql'));
 await db.exec(`
 create table public.game_consumables(
  id text primary key,name text not null,family text not null,tier integer not null,
- effect_value numeric not null,duration_seconds integer,purchasable boolean default false,shop_price numeric
+ effect_value numeric not null,duration_seconds integer not null,purchasable boolean default false,shop_price numeric
 );
 create table public.player_consumables(
  player_id uuid references public.players(id),consumable_id text references public.game_consumables(id),
@@ -34,7 +34,7 @@ insert into public.game_consumables(id,name,family,tier,effect_value,duration_se
  ('lucky-potion-4','Lucky Potion IV','luck',4,.75,60),('fortune-potion-4','Fortune Potion IV','weightLuck',4,.75,60),
  ('speed-potion-4','Speed Potion IV','rollSpeed',4,.75,60),('mass-potion-4','Mass Potion IV','weightMultiplier',4,.5,60),
  ('money-up-potion-2','Money Up Potion II','gemValue',2,2,60),('relic-potion','Relic Potion','relic',1,1.5,60),
- ('legendary-potion','Legendary Potion','luck',4,1000,null),('mythic-potion','Mythic Potion','luck',4,10000,null);
+ ('legendary-potion','Legendary Potion','luck',4,1000,1),('mythic-potion','Mythic Potion','luck',4,10000,1);
 alter role service_role bypassrls;
 create schema extensions;
 create function extensions.gen_random_bytes(n integer) returns bytea language sql volatile as $$select decode(substr(repeat(md5(random()::text),8),1,n*2),'hex')$$;
@@ -48,6 +48,7 @@ await db.exec(read('../supabase/migrations/20261004030718_facets_store_v1.sql'))
 await db.exec(read('../supabase/migrations/20261005001849_prismatic_geodes.sql'));
 
 assert.equal(await value("select effect_value::int result from game_consumables where id='exotic-potion'"), 100000);
+assert.equal(await value("select duration_seconds result from game_consumables where id='exotic-potion'"), 1);
 assert.equal(await value("select purchasable result from game_consumables where id='exotic-potion'"), false);
 assert.doesNotMatch(read('../supabase/migrations/20260930094319_auction_market_redesign.sql'), /when 'exotic-potion'/, 'Exotic Potion has no market value and cannot be listed');
 assert.equal(await value("select count(*)::int result from cosmetic_store_items where cosmetic_id like 'prismatic-%'"), 0, 'Prismatic cosmetics cannot be bought with Facets or vouchers');
