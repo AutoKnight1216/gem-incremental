@@ -26,4 +26,6 @@ assert.match(css, /\.reward-ultimate/);
 assert.match(css, /@media\(max-width:560px\).*\.prismatic-hero/);
 assert.match(css, /prefers-reduced-motion:reduce/);
 for (const [file, selector] of [['../style.css','data-roll-card="prismatic"'],['../leaderboards/leaderboards.css','data-leaderboard-skin="prismatic"'],['../user/profile.css','data-background="prismatic"']]) assert.ok(read(file).includes(selector));
+assert.match(read('../src/ui/equippedCosmetics.js'), /rollStyles[^;]+prismatic/);
+assert.match(read('../leaderboards/leaderboards.js'), /leaderboardSkinStyles[^;]+prismatic/);
 console.log('Prismatic Store navigation, mobile layout, opening flow, vouchers and cosmetic previews passed.');
