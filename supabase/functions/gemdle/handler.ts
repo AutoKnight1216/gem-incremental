@@ -67,11 +67,17 @@ export function createHandler(admin: any, clock = () => new Date()) {
         created = true;
       }
       // A board outage must not hide a successfully persisted specimen.
-      let board = null;
-      try { board = unwrap(await admin.rpc("gemdle_daily_board", { p_date: day, p_player_id: playerId })); }
-      catch (error) { console.error("Gemdle board unavailable", error); }
-      const lifetimeScore = unwrap(await admin.rpc("gemdle_lifetime_rarity_score", { p_player_id: playerId }));
-      return json({ ...time, result, created, board, lifetime_rarity_score: lifetimeScore, leaderboard_hidden: profile.leaderboard_hidden === true });
+      const optionalBoard = async (name: string, args: any, label: string) => {
+        try { return unwrap(await admin.rpc(name, args)); }
+        catch (error) { console.error(`${label} unavailable`, error); return null; }
+      };
+      const [board, lifetimeBoard, lifetimeScoreResponse] = await Promise.all([
+        optionalBoard("gemdle_daily_board", { p_date: day, p_player_id: playerId }, "Gemdle daily board"),
+        optionalBoard("gemdle_lifetime_board", { p_player_id: playerId }, "Gemdle lifetime board"),
+        admin.rpc("gemdle_lifetime_rarity_score", { p_player_id: playerId })
+      ]);
+      const lifetimeScore = unwrap(lifetimeScoreResponse);
+      return json({ ...time, result, created, board, lifetime_board: lifetimeBoard, lifetime_rarity_score: lifetimeScore, leaderboard_hidden: profile.leaderboard_hidden === true });
     } catch (error) {
       console.error("Gemdle request failed", error);
       return json({ error: "gemdle_unavailable" }, 503);

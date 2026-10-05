@@ -130,11 +130,22 @@ function renderBoard(data) {
       return `<div class="gemdle-row ${entry.is_you ? "is-you" : ""}"><span class="rank">#${entry.rank}</span><span class="row-main"><strong>${esc(entry.username)}${entry.is_you ? " (you)" : ""}</strong><small>${esc(s.gem_name)} · ${number(s.weight_multiplier)}× · ${esc(mutationNames(s))}</small></span><strong class="row-score">1 in ${odds(s.overall_rarity)}</strong></div>`;
     }).join("");
 }
+function renderLifetimeBoard(data) {
+  const board = data.lifetime_board;
+  $("lifetime-own-rank").textContent = data.leaderboard_hidden ? "Your leaderboard visibility is hidden." :
+    board?.own_rank ? `Your lifetime position: #${board.own_rank} of ${board.participants}` :
+    today ? "Your lifetime rank is currently unavailable." : "Roll a Gemdle to join the lifetime leaderboard.";
+  $("lifetime-leaderboard").innerHTML = !board ? "Lifetime leaderboard temporarily unavailable." :
+    !board.entries.length ? "No lifetime scores yet." : board.entries.map(entry => {
+      const discoveries = Number(entry.discoveries);
+      return `<div class="gemdle-row ${entry.is_you ? "is-you" : ""}"><span class="rank">#${entry.rank}</span><span class="row-main"><strong>${esc(entry.username)}${entry.is_you ? " (you)" : ""}</strong><small>${number(discoveries)} ${discoveries === 1 ? "discovery" : "discoveries"}</small></span><strong class="row-score">${odds(entry.total_score)} pts</strong></div>`;
+    }).join("");
+}
 async function load(action = "state") {
   if (busy) return;
   busy = true;
   const generation = accountGeneration;
-  $("roll").disabled = true; $("refresh").hidden = true; $("refresh-board").disabled = true;
+  $("roll").disabled = true; $("refresh").hidden = true; $("refresh-board").disabled = true; $("refresh-lifetime").disabled = true;
   $("status").textContent = action === "roll" ? "Discovering your specimen…" : "Loading today's Gemdle…";
   try {
     const data = await api(action);
@@ -145,6 +156,7 @@ async function load(action = "state") {
     else { $("result").hidden = true; $("share").hidden = true; $("unrolled").hidden = false; $("roll").hidden = false; }
     if (generation !== accountGeneration) return;
     renderBoard(data);
+    renderLifetimeBoard(data);
     $("status").textContent = today ? "Today's discovery is saved. Come back tomorrow." : "Your daily discovery is ready.";
     if (action === "roll" && data.created) await animateLifetimeScore(data.lifetime_rarity_score, today.specimen.overall_rarity, generation);
     else syncLifetimeScore(data.lifetime_rarity_score);
@@ -154,7 +166,7 @@ async function load(action = "state") {
     $("status").textContent = error.message; $("refresh").hidden = false;
   } finally {
     if (generation === accountGeneration) {
-      busy = false; $("roll").disabled = false; $("roll").textContent = "Roll today's Gemdle"; $("refresh-board").disabled = false;
+      busy = false; $("roll").disabled = false; $("roll").textContent = "Roll today's Gemdle"; $("refresh-board").disabled = false; $("refresh-lifetime").disabled = false;
     }
   }
 }
@@ -192,6 +204,7 @@ async function share(row) {
 $("roll").onclick = () => load("roll");
 $("refresh").onclick = () => { load(); loadHistory(true); };
 $("refresh-board").onclick = () => load();
+$("refresh-lifetime").onclick = () => load();
 $("more").onclick = () => loadHistory();
 $("share").onclick = () => share(today);
 $("share-past").onclick = () => share(past);
@@ -217,9 +230,9 @@ supabase.auth.onAuthStateChange((_event, session) => {
   today = null; past = null; nextCursor = null; historyRows.length = 0; resetAt = 0; lifetimeScore = null;
   $("past").close(); $("result").hidden = true; $("share").hidden = true; $("share-text").hidden = true;
   $("unrolled").hidden = false; $("roll").hidden = false;
-  $("leaderboard").textContent = "Loading leaderboard…"; $("history").textContent = "Loading history…";
+  $("leaderboard").textContent = "Loading leaderboard…"; $("lifetime-leaderboard").textContent = "Loading leaderboard…"; $("history").textContent = "Loading history…";
   $("lifetime-score").textContent = "Loading…";
-  $("own-rank").textContent = ""; $("result-rank").hidden = true;
+  $("own-rank").textContent = ""; $("lifetime-own-rank").textContent = ""; $("result-rank").hidden = true;
   // Avoid making Auth calls synchronously inside the Auth callback.
   setTimeout(() => { load(); loadHistory(true); }, 0);
 });

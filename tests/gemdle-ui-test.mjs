@@ -16,7 +16,7 @@ export const supabase={auth:{onAuthStateChange(fn){setTimeout(()=>fn('INITIAL_SE
 window.testCalls=(window.testCalls||[]).concat(body);
 if(body.action==='roll'){rolled=true;sessionStorage.setItem('gemdle-test-rolled','yes');}
 const row=${JSON.stringify(row)};
-return {data:body.action==='history'?{history:rolled?[row]:[],next_cursor:null,lifetime_rarity_score:'NaN'}:{gemdle_date:row.gemdle_date,server_now:new Date().toISOString(),resets_at:new Date(Date.now()+3600000).toISOString(),result:rolled?row:null,created:body.action==='roll',lifetime_rarity_score:'NaN',board:{entries:rolled?[{rank:1,username:'<img src=x onerror=alert(1)>',specimen:row.specimen,is_you:true}]:[],own_rank:rolled?1:null,participants:rolled?1:0}}};
+return {data:body.action==='history'?{history:rolled?[row]:[],next_cursor:null,lifetime_rarity_score:'NaN'}:{gemdle_date:row.gemdle_date,server_now:new Date().toISOString(),resets_at:new Date(Date.now()+3600000).toISOString(),result:rolled?row:null,created:body.action==='roll',lifetime_rarity_score:'NaN',board:{entries:rolled?[{rank:1,username:'<img src=x onerror=alert(1)>',specimen:row.specimen,is_you:true}]:[],own_rank:rolled?1:null,participants:rolled?1:0},lifetime_board:{entries:rolled?[{rank:1,username:'<img src=x onerror=alert(1)>',total_score:row.specimen.overall_rarity,discoveries:1,is_you:true}]:[],own_rank:rolled?1:null,participants:rolled?1:0}}};
 }}};` }));
 await page.goto(process.env.GEMDLE_PREVIEW_URL || 'http://127.0.0.1:5527/gemdle/');
 await page.waitForTimeout(500);
@@ -33,7 +33,11 @@ await page.locator('#result').screenshot({path:'/tmp/gemdle-lifetime-gain.png'})
 await page.locator('[data-lifetime-gain]').waitFor({state:'hidden'});
 assert.equal(await page.locator('#result .specimen-name').textContent(),'Mythril');
 assert.equal(await page.locator('#leaderboard img').count(),0);
+assert.equal(await page.locator('#lifetime-leaderboard img').count(),0);
 assert.match(await page.locator('#own-rank').textContent(),/#1/);
+assert.match(await page.locator('#lifetime-own-rank').textContent(),/#1/);
+assert.match(await page.locator('#lifetime-leaderboard').textContent(),/1 discovery/);
+assert.match(await page.locator('#lifetime-leaderboard .row-score').textContent(),/pts/);
 assert.match(await page.locator('#lifetime-score').textContent(),/points/);
 assert.doesNotMatch(await page.locator('#lifetime-score').textContent(),/NaN/);
 assert.equal(await page.locator('#lifetime-score').textContent(),await page.locator('[data-lifetime-value]').textContent());
@@ -51,8 +55,10 @@ assert.equal(await page.locator('#roll').isVisible(),false);
 assert.ok(!(await page.evaluate(()=>window.testCalls)).some(c=>c.action==='roll'));
 await page.setViewportSize({width:390,height:844});
 await page.screenshot({path:'/tmp/gemdle-mobile.png',fullPage:true});
+await page.locator('#lifetime-board-card').scrollIntoViewIfNeeded();
+await page.locator('#lifetime-board-card').screenshot({path:'/tmp/gemdle-mobile-lifetime-board.png'});
 await page.locator('#collection-card').scrollIntoViewIfNeeded();
 await page.locator('#collection-card').screenshot({path:'/tmp/gemdle-mobile-collection.png'});
 assert.ok(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth));
 assert.deepEqual(errors,[]);
-await browser.close();console.log('PASS: reveal, reload persistence, rank, lifetime score, collapsible collection, history dialog, escaped usernames, mobile layout');
+await browser.close();console.log('PASS: reveal, reload persistence, daily and lifetime ranks, lifetime score, collapsible collection, history dialog, escaped usernames, mobile layout');
