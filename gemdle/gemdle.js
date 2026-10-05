@@ -135,7 +135,7 @@ function renderLifetimeBoard(data) {
   $("lifetime-own-rank").textContent = data.leaderboard_hidden ? "Your leaderboard visibility is hidden." :
     board?.own_rank ? `Your lifetime position: #${board.own_rank} of ${board.participants}` :
     today ? "Your lifetime rank is currently unavailable." : "Roll a Gemdle to join the lifetime leaderboard.";
-  $("lifetime-leaderboard").innerHTML = !board ? "Lifetime leaderboard temporarily unavailable." :
+  $("lifetime-leaderboard").innerHTML = !board ? (Object.hasOwn(data, "lifetime_board") ? "Lifetime leaderboard temporarily unavailable." : "Lifetime leaderboard backend update pending. Deploy the latest Gemdle Edge Function.") :
     !board.entries.length ? "No lifetime scores yet." : board.entries.map(entry => {
       const discoveries = Number(entry.discoveries);
       return `<div class="gemdle-row ${entry.is_you ? "is-you" : ""}"><span class="rank">#${entry.rank}</span><span class="row-main"><strong>${esc(entry.username)}${entry.is_you ? " (you)" : ""}</strong><small>${number(discoveries)} ${discoveries === 1 ? "discovery" : "discoveries"}</small></span><strong class="row-score">${odds(entry.total_score)} pts</strong></div>`;
