@@ -47,8 +47,11 @@ export function createHandler(admin: any, clock = () => new Date()) {
         if (before != null && (typeof before !== "string" || !/^\d{4}-\d{2}-\d{2}$/.test(before) || !Number.isFinite(Date.parse(before)))) return json({ error: "invalid_cursor" }, 400);
         let query = admin.from("gemdle_results").select("gemdle_date,rolled_at,specimen").eq("player_id", playerId).order("gemdle_date", { ascending: false }).limit(31);
         if (before) query = query.lt("gemdle_date", before);
-        const rows = unwrap(await query);
-        return json({ ...time, history: rows.slice(0, 30), next_cursor: rows.length > 30 ? rows[29].gemdle_date : null });
+        const [rows, lifetimeScore] = await Promise.all([
+          query.then(unwrap),
+          admin.rpc("gemdle_lifetime_rarity_score", { p_player_id: playerId }).then(unwrap)
+        ]);
+        return json({ ...time, history: rows.slice(0, 30), next_cursor: rows.length > 30 ? rows[29].gemdle_date : null, lifetime_rarity_score: lifetimeScore });
       }
       let result = unwrap(await admin.from("gemdle_results").select("gemdle_date,rolled_at,specimen").eq("player_id", playerId).eq("gemdle_date", day).maybeSingle());
       let created = false;
@@ -67,7 +70,8 @@ export function createHandler(admin: any, clock = () => new Date()) {
       let board = null;
       try { board = unwrap(await admin.rpc("gemdle_daily_board", { p_date: day, p_player_id: playerId })); }
       catch (error) { console.error("Gemdle board unavailable", error); }
-      return json({ ...time, result, created, board, leaderboard_hidden: profile.leaderboard_hidden === true });
+      const lifetimeScore = unwrap(await admin.rpc("gemdle_lifetime_rarity_score", { p_player_id: playerId }));
+      return json({ ...time, result, created, board, lifetime_rarity_score: lifetimeScore, leaderboard_hidden: profile.leaderboard_hidden === true });
     } catch (error) {
       console.error("Gemdle request failed", error);
       return json({ error: "gemdle_unavailable" }, 503);

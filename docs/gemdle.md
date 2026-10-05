@@ -4,7 +4,7 @@ Prepared for Supabase project `igrddscmrdrrwtvyspbf`. No migration or function w
 
 ## Manual deployment
 
-1. Apply **only** `supabase/migrations/20260904145142_gemdle_daily_results.sql` in the project's SQL Editor (or your usual migration workflow). It depends on existing `players` and `user_roll_luck_rarity_mult` tables. Do not blindly push all historical migrations from this repository.
+1. If Gemdle V1 is not already deployed, apply `supabase/migrations/20260904145142_gemdle_daily_results.sql` first. Then apply `supabase/migrations/20261005081317_gemdle_lifetime_rarity_score.sql`. Use the project's SQL Editor or usual migration workflow, and do not blindly push every historical migration from this repository.
 2. From the repository root, deploy the new function:
 
    ```sh
@@ -27,12 +27,12 @@ Prepared for Supabase project `igrddscmrdrrwtvyspbf`. No migration or function w
 - Mutations follow catalog sort order (ID breaks ties). Every mutation after the first success gets the same ×0.35 chance factor; it is not compounded once per success. Only successful checks contribute to rarity. The live catalog has no mutual-exclusion columns today; explicit `eligible_gems`, `required_event_key`, and symmetric `excludes` rules are supported if added.
 - Weight is a baseline port of `src/logic/weight.js`, with no boosts. For `w >= 2`, the rarity factor is `16 * 2^(floor(w)-2) / (1 - fractional(w)/2)`; below 2 it is 1. Raw precision is stored; display rounding never changes rankings.
 - Highest tier/weight/stack badges follow the final design. The unspecified “Rare Mutation” cutoff is set to normal rarity ≥1/10,000. Troll is a flavor badge when catalog `metadata.troll` is true.
-- History stores immutable specimen snapshots so future balancing/catalog changes do not rewrite old scores. History is paginated in batches of 30 and retained for the account's lifetime.
+- History stores immutable specimen snapshots so future balancing/catalog changes do not rewrite old scores. History is paginated in batches of 30 and retained for the account's lifetime. The collection is collapsible, while its header keeps the lifetime rarity score visible. That score is the sum of every saved specimen's server-authored Overall Rarity. After a new Overall Rarity reveal, a subtle green gain appears and the previous lifetime score counts up to its new total; reduced-motion mode skips the count-up.
 - Equal scores share a rank. The visible board contains 50 entries, with a separate own-rank lookup. Existing leaderboard-hidden settings and active suspensions are respected. Share text uses the Singapore date rather than inventing a launch-day numbering epoch.
 
 ## Security
 
-The browser sends only an action and optional history cursor. Client-supplied player IDs, dates, gems, scores and stats are ignored. Authenticated users can directly read only their own history through RLS. Neither anonymous nor authenticated roles have INSERT/UPDATE/DELETE access, or access to the save/board RPCs. The service role has SELECT/INSERT on results, with no UPDATE/DELETE grant. Both RPCs are security invoker with an empty search path and service-only execution.
+The browser sends only an action and optional history cursor. Client-supplied player IDs, dates, gems, scores and stats are ignored. Authenticated users can directly read only their own history through RLS. Neither anonymous nor authenticated roles have INSERT/UPDATE/DELETE access, or access to the save, board, or lifetime-score RPCs. The service role has SELECT/INSERT on results, with no UPDATE/DELETE grant. All three RPCs are security invoker with an empty search path and service-only execution.
 
 `UNIQUE(player_id, gemdle_date)` plus `INSERT ... ON CONFLICT DO NOTHING` makes the first committed specimen authoritative. A retry returns the stored specimen; it cannot overwrite it. The leaderboard reads those rows, without a separate score submission. Its response contains names, ranks and specimens, not account IDs or emails.
 
@@ -59,9 +59,9 @@ node tests/gemdle-ui-test.mjs
 
 Validated locally:
 
-- 12 RNG/API/format tests, including 10,000 identical-sequence comparisons with the original weight source and a 200,000-roll weight-band simulation.
-- Migration executes; RLS and grants block client writes/service RPCs, preserve duplicate results, honor the SGT date boundary, ties, privacy settings, and own rank outside the top 50. PGlite serializes database calls, so a real multi-connection race remains a post-deployment smoke check.
-- Desktop/mobile browser reveal, saved-result reload, history dialog, rank, escaped usernames and no horizontal overflow; light-theme card contrast visually checked.
+- 13 RNG/API/format tests, including lifetime-score response coverage, 10,000 identical-sequence comparisons with the original weight source, and a 200,000-roll weight-band simulation.
+- Both migrations execute; RLS and grants block client writes/service RPCs, compute the lifetime score, preserve duplicate results, honor the SGT date boundary, ties, privacy settings, and own rank outside the top 50. PGlite serializes database calls, so a real multi-connection race remains a post-deployment smoke check.
+- Desktop/mobile browser reveal, saved-result reload, collapsible collection, synchronized lifetime score and post-roll count-up, history dialog, rank, escaped usernames and no horizontal overflow; light-theme card contrast visually checked.
 - All 216 currently enabled live catalog entries inspected read-only. Hourly non-event probability averaging gives approximately 24.79% ≥1/10K, 7.42% ≥1/100K, 2.33% ≥1M, 0.533% ≥10M, 0.137% ≥100M, and 0.00301% ≥1B. Event days vary as designed.
 
 Live end-to-end verification is pending your manual deployment. No sub-second latency guarantee is claimed for Gemdle; the existing optimized normal roll function remains untouched.
