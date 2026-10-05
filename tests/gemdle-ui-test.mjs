@@ -16,12 +16,14 @@ export const supabase={auth:{onAuthStateChange(fn){setTimeout(()=>fn('INITIAL_SE
 window.testCalls=(window.testCalls||[]).concat(body);
 if(body.action==='roll'){rolled=true;sessionStorage.setItem('gemdle-test-rolled','yes');}
 const row=${JSON.stringify(row)};
-return {data:body.action==='history'?{history:rolled?[row]:[],next_cursor:null,lifetime_rarity_score:rolled?row.specimen.overall_rarity:0}:{gemdle_date:row.gemdle_date,server_now:new Date().toISOString(),resets_at:new Date(Date.now()+3600000).toISOString(),result:rolled?row:null,created:body.action==='roll',lifetime_rarity_score:rolled?row.specimen.overall_rarity:0,board:{entries:rolled?[{rank:1,username:'<img src=x onerror=alert(1)>',specimen:row.specimen,is_you:true}]:[],own_rank:rolled?1:null,participants:rolled?1:0}}};
+return {data:body.action==='history'?{history:rolled?[row]:[],next_cursor:null,lifetime_rarity_score:'NaN'}:{gemdle_date:row.gemdle_date,server_now:new Date().toISOString(),resets_at:new Date(Date.now()+3600000).toISOString(),result:rolled?row:null,created:body.action==='roll',lifetime_rarity_score:'NaN',board:{entries:rolled?[{rank:1,username:'<img src=x onerror=alert(1)>',specimen:row.specimen,is_you:true}]:[],own_rank:rolled?1:null,participants:rolled?1:0}}};
 }}};` }));
 await page.goto(process.env.GEMDLE_PREVIEW_URL || 'http://127.0.0.1:5527/gemdle/');
 await page.waitForTimeout(500);
 assert.deepEqual(errors,[]);
 await page.getByRole('button',{name:"Roll today's Gemdle",exact:true}).waitFor();
+await page.waitForFunction(()=>document.querySelector('#lifetime-score')?.textContent==='0 points');
+assert.doesNotMatch(await page.locator('#lifetime-score').textContent(),/NaN/);
 await page.locator('#roll').click();
 await page.locator('#share').waitFor({state:'visible'});
 await page.locator('[data-lifetime-gain]').waitFor({state:'visible'});
@@ -33,6 +35,7 @@ assert.equal(await page.locator('#result .specimen-name').textContent(),'Mythril
 assert.equal(await page.locator('#leaderboard img').count(),0);
 assert.match(await page.locator('#own-rank').textContent(),/#1/);
 assert.match(await page.locator('#lifetime-score').textContent(),/points/);
+assert.doesNotMatch(await page.locator('#lifetime-score').textContent(),/NaN/);
 assert.equal(await page.locator('#lifetime-score').textContent(),await page.locator('[data-lifetime-value]').textContent());
 await page.locator('.collection-summary').click();
 assert.equal(await page.locator('#collection-card').evaluate(el=>el.open),false);

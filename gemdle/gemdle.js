@@ -53,15 +53,41 @@ async function showResult(row, animate, generation) {
 function lifetimeValues() { return [$("lifetime-score"), ...document.querySelectorAll("[data-lifetime-value]")].filter(Boolean); }
 function lifetimeGains() { return [$("lifetime-gain"), ...document.querySelectorAll("[data-lifetime-gain]")].filter(Boolean); }
 function renderLifetimeValue(value) { lifetimeValues().forEach(element => { element.textContent = `${odds(value)} points`; }); }
+function validLifetimeScore(value) {
+  const score = Number(value);
+  return Number.isFinite(score) && score >= 0 ? score : null;
+}
 function syncLifetimeScore(value) {
-  lifetimeScore = Number(value);
+  const score = validLifetimeScore(value);
+  if (score == null) {
+    if (lifetimeScore == null) $("lifetime-score").textContent = "Calculating…";
+    return false;
+  }
+  lifetimeScore = score;
   renderLifetimeValue(lifetimeScore);
   const resultLifetime = $("result-lifetime");
   if (resultLifetime) resultLifetime.hidden = false;
   lifetimeGains().forEach(element => { element.hidden = true; element.classList.remove("is-fading"); });
+  return true;
+}
+function historyScore(rows) {
+  return rows.reduce((total, row) => total + (validLifetimeScore(row?.specimen?.overall_rarity) ?? 0), 0);
+}
+async function calculateLifetimeFromHistory(cursor, generation) {
+  let total = historyScore(historyRows), before = cursor;
+  const seen = new Set();
+  while (before && !seen.has(before)) {
+    seen.add(before);
+    const page = await api("history", { before });
+    if (generation !== accountGeneration) return null;
+    total += historyScore(Array.isArray(page.history) ? page.history : []);
+    before = page.next_cursor;
+  }
+  return total;
 }
 async function animateLifetimeScore(value, gained, generation) {
-  const next = Number(value), gain = Number(gained);
+  const gain = validLifetimeScore(gained) ?? 0;
+  const next = validLifetimeScore(value) ?? (lifetimeScore ?? 0) + gain;
   const previous = lifetimeScore == null ? Math.max(0, next - gain) : lifetimeScore;
   lifetimeScore = next;
   const resultLifetime = $("result-lifetime");
@@ -142,7 +168,15 @@ async function loadHistory(reset = false) {
     if (reset) historyRows.length = 0;
     historyRows.push(...data.history);
     nextCursor = data.next_cursor;
-    syncLifetimeScore(data.lifetime_rarity_score);
+    if (!syncLifetimeScore(data.lifetime_rarity_score)) {
+      try {
+        const calculated = await calculateLifetimeFromHistory(nextCursor, generation);
+        if (generation === accountGeneration) syncLifetimeScore(calculated);
+      } catch (error) {
+        console.warn("Gemdle lifetime score fallback unavailable", error);
+        if (generation === accountGeneration && lifetimeScore == null) $("lifetime-score").textContent = "Unavailable";
+      }
+    }
     $("history").innerHTML = historyRows.length ? historyRows.map((row, i) => `<button class="gemdle-row" data-history="${i}"><span class="row-main"><small>${esc(row.gemdle_date)}</small><strong>${esc(row.specimen.gem_name)}</strong><small>${number(row.specimen.final_weight)} g · ${number(row.specimen.weight_multiplier)}× · ${esc(mutationNames(row.specimen))}</small></span><span class="row-score">1 in ${odds(row.specimen.overall_rarity)}</span></button>`).join("") : "Your first discovery starts your collection.";
     $("more").hidden = !nextCursor;
   } catch (error) {
