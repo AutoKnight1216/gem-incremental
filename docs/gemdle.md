@@ -28,6 +28,7 @@ Prepared for Supabase project `igrddscmrdrrwtvyspbf`. No migration or function w
 - Weight is a baseline port of `src/logic/weight.js`, with no boosts. For `w >= 2`, the rarity factor is `16 * 2^(floor(w)-2) / (1 - fractional(w)/2)`; below 2 it is 1. Raw precision is stored; display rounding never changes rankings.
 - Highest tier/weight/stack badges follow the final design. The unspecified “Rare Mutation” cutoff is set to normal rarity ≥1/10,000. Troll is a flavor badge when catalog `metadata.troll` is true.
 - History stores immutable specimen snapshots so future balancing/catalog changes do not rewrite old scores. History is paginated in batches of 30 and retained for the account's lifetime. The collection is collapsible, while its header keeps the lifetime rarity score visible. That score is the sum of every saved specimen's server-authored Overall Rarity. After a new Overall Rarity reveal, a subtle green gain appears and the previous lifetime score counts up to its new total; reduced-motion mode skips the count-up.
+- During a staggered deployment, a missing or non-finite lifetime-score field never renders as `NaN`. The client temporarily calculates the same sum from the authenticated paginated history response until the updated Edge Function is available.
 - Equal scores share a rank. The visible board contains 50 entries, with a separate own-rank lookup. Existing leaderboard-hidden settings and active suspensions are respected. Share text uses the Singapore date rather than inventing a launch-day numbering epoch.
 
 ## Security
