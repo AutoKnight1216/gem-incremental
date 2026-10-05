@@ -75,6 +75,18 @@ function prismaticPage() {
     </div>
     <aside class="prismatic-wallet"><span>PRISMATIC SHARDS</span><strong>◇ ${Number(wallet.shards || 0).toLocaleString()}</strong><small>Account-bound · cannot become Facets</small><div class="voucher-balances"><span>🎟 ${Number(wallet.cosmeticVouchers || 0)} Cosmetic</span><span>🌈 ${Number(wallet.ultimateVouchers || 0)} Ultimate</span></div></aside>
   </section>
+  <section class="prismatic-loot card" aria-labelledby="prismaticLootTitle">
+    <div class="prismatic-loot__head"><span class="store-kicker">FUZZY LOOT TABLE</span><h3 id="prismaticLootTitle">What might be inside?</h3><p>A simplified rarity guide. Every chamber rolls independently.</p></div>
+    <dl class="prismatic-loot__tiers">
+      <div class="loot-tier loot-tier--common"><dt>Common</dt><dd>$50,000–$500,000</dd></div>
+      <div class="loot-tier loot-tier--uncommon"><dt>Uncommon</dt><dd>Tier IV potions</dd></div>
+      <div class="loot-tier loot-tier--rare"><dt>Rare</dt><dd>Prismatic Shard</dd></div>
+      <div class="loot-tier loot-tier--epic"><dt>Epic</dt><dd>Exotic Potion</dd></div>
+      <div class="loot-tier loot-tier--legendary"><dt>Legendary</dt><dd>Cosmetic Voucher</dd></div>
+      <div class="loot-tier loot-tier--mythic"><dt>Mythic</dt><dd>Ultimate Cosmetic Voucher</dd></div>
+    </dl>
+    <small class="prismatic-loot__note">Other potion rewards can also appear. This guide shows reward families, not exact odds.</small>
+  </section>
   <div class="store-section-head prismatic-exchange-head"><div><span class="store-kicker">PRISMATIC EXCHANGE</span><h2>Refracted rewards</h2><p>Faceted crystal cosmetics earned only through play. Shards cannot be bought, traded, gifted, sold, or converted.</p></div></div>
   <div class="cosmetic-grid">${PRISMATIC_ITEMS.map(prismaticCard).join('')}</div>
   <article class="collection-card card prismatic-collection"><div class="collection-emblem style-prismatic">◇</div><div><span class="store-kicker">COMPLETE COLLECTION</span><h3>Prismatic Collection</h3><p>All four F2P-exclusive crystal treatments. Already-owned pieces reduce the server-calculated price proportionally.</p><div class="collection-pieces">${PRISMATIC_ITEMS.map(item => `<span class="${owned.has(item.id) ? 'is-owned' : ''}">${owned.has(item.id) ? '✓ ' : ''}${item.typeLabel}</span>`).join('')}</div></div><div class="collection-price">${collectionPrice ? `<div><strong>◇ ${formatShards(collectionPrice)}</strong><del>◇ 65 Shards individually</del><small>50/65 collection rate applied only to unowned pieces</small></div><button class="btn btn--prismatic" data-prismatic-buy="prismatic" data-kind="collection" ${state.prismaticOnline ? '' : 'disabled'}>Complete collection</button>` : `<span class="owned-pill">Collection owned</span>`}</div></article>`;
