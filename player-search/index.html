@@ -1,0 +1,96 @@
+<!DOCTYPE html>
+
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="color-scheme" content="dark light">
+  <meta name="theme-color" content="#0b0e14">
+  <meta name="description" content="Search for Gem Incremental players.">
+
+  <title>Player Search · Gem Incremental</title>
+
+  <link rel="icon" type="image/x-icon" href="../src/assets/favicon.ico">
+  <link rel="stylesheet" href="../src/styles/app.css">
+  <link rel="stylesheet" href="./search.css">
+
+  <script>
+    (function () {
+      try {
+        var m = localStorage.getItem("gemIncremental.theme.mode");
+        var a = localStorage.getItem("gemIncremental.theme.accent");
+
+        if (["light", "dark", "neon"].includes(m)) {
+          document.documentElement.setAttribute("data-theme", m);
+        }
+
+        document.documentElement.setAttribute(
+          "data-accent",
+          a || "indigo"
+        );
+      } catch (e) {}
+    })();
+  </script>
+
+  <!-- Cloudflare Web Analytics -->
+
+  <script
+    type="module"
+    src="https://static.cloudflareinsights.com/beacon.min.js"
+    data-cf-beacon='{"token":"72a2f511dbb94268878b2aa1623ffe0d"}'>
+  </script>
+
+  <!-- End Cloudflare Web Analytics -->
+
+</head>
+
+<body>
+  <main class="app-main codes-page">
+    <section class="codes-card card">
+
+  <div class="codes-icon" id="codesIcon"></div>
+
+  <p class="codes-eyebrow">Player search</p>
+
+  <h1>Search for a player</h1>
+
+  <p class="codes-copy">
+    Enter a player's username to search for their Gem Incremental account.
+  </p>
+
+  <form id="searchForm" class="codes-form">
+    <label class="field">
+      <span>Username</span>
+
+      <input
+        id="user"
+        type="text"
+        minlength="3"
+        maxlength="32"
+        autocomplete="off"
+        autocapitalize="off"
+        spellcheck="false"
+        placeholder="Username"
+        required
+      >
+    </label>
+
+    <button
+      id="search"
+      class="btn btn--primary"
+      type="submit"
+    >
+      Search
+    </button>
+  </form>
+
+  <div id="searchResult" class="codes-result" hidden></div>
+
+</section>
+
+  </main>
+
+  <script type="module" src="./search.js"></script>
+
+</body>
+</html>
