@@ -3451,8 +3451,12 @@ async function executeSingleRoll(
       };
 
       const equipmentCommitStartedAt = timingNow(batchExecution);
+      // A declined Auto Craft result may mark the specimen as preserved to
+      // mean "do not consume it". That must not override an explicit Gem
+      // Filter SELL decision. Conservation only keeps the extra specimen when
+      // Auto Craft actually accepted the deposit.
       const autoSellRequested = filterDecision.sell && shouldSavePrimary && !relicDrop &&
-        !bundleKeepInInventory && !autoDeposited && !autoConserved;
+        !bundleKeepInInventory && !autoDeposited;
       const { data: committedResult, error: equipmentCommitError } = await ctx.supabaseAdmin.rpc('roll_commit_result', {
         p_player_id: playerId, p_lease_id: rollLeaseId, p_genuine_roll: genuineRoll,
         p_primary_specimen: inventorySpecimen,
